@@ -176,6 +176,14 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
   }
   else  if (huart->Instance == USART2)
   {
+	    HAL_UART_AbortReceive(huart);
+
+	    qbufferCreate(&qbuffer[_DEF_UART1], &rx_buf[0], 256);
+
+	    HAL_UART_Receive_DMA(&huart2, (uint8_t *)&rx_buf[0], 256);
+
+	    qbuffer[_DEF_UART1].in  = qbuffer[_DEF_UART1].len - hdma_usart2_rx.Instance->CNDTR;
+	    qbuffer[_DEF_UART1].out = qbuffer[_DEF_UART1].in;
   }
 }
 
@@ -190,7 +198,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
 #endif
 }
-
 
 
 
