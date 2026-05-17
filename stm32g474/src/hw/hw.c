@@ -15,15 +15,9 @@ void hwInit(void)
 
   cliInit();
   ledInit();
-  usbInit();
   uartInit();
   buttonInit();
   gpioInit();
-  flashInit();
-  spiInit();
 
-  usbBegin(USB_CDC_MODE);
-//  lcdInit();
-  midiInit();
 
 }

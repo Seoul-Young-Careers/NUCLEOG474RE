@@ -57,12 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Virtual_COM_Tx_Pin GPIO_PIN_2
-#define Virtual_COM_Tx_GPIO_Port GPIOA
-#define Virtual_COM_Rx_Pin GPIO_PIN_3
-#define Virtual_COM_Rx_GPIO_Port GPIOA
-#define LED_Pin GPIO_PIN_5
-#define LED_GPIO_Port GPIOA
+#define pwm_PUL_Pin GPIO_PIN_6
+#define pwm_PUL_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

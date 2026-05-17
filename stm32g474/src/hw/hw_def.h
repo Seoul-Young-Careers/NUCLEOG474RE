@@ -34,13 +34,6 @@
 #define	_USE_HW_GPIO
 #define		 HW_GPIO_MAX_CH			1
 
-#define _PIN_GPIO_SDCARD_DETECT		0
-
-
-#define _USE_HW_CDC
-#define _USE_HW_USB
-#define      HW_USE_CDC             1
-#define      HW_USE_MSC             0
 
 #define	_USE_HW_SPI
 #define HW_SPI_MAX_CH				1
@@ -50,10 +43,4 @@
 #define		HW_LCD_WIDTH			160
 #define 	HW_LCD_HEIGHT     		160
 
-#define	_USE_HW_MIDI
-#define _USE_HW_VS1053
-
-#define _USE_HW_I2C
-
-#define TEST
 #endif /* SRC_HW_HW_DEF_H_ */

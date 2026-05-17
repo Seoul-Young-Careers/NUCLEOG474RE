@@ -1,6 +1,6 @@
 .metadata/
-stm32l432kc/Debug/
-stm32l432kc/Release/
+stm32g474/Debug/
+stm32g474/Release/
 
 *.o
 *.d
