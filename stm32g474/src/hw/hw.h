@@ -17,6 +17,7 @@
 #include "cli.h"
 #include "button.h"
 #include "gpio.h"
+#include "pwm.h"
 
 
 void hwInit(void);

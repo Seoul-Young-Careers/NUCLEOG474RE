@@ -18,6 +18,6 @@ void hwInit(void)
   uartInit();
   buttonInit();
   gpioInit();
-
+  pwmInit();
 
 }
