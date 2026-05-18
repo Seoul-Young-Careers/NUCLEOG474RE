@@ -35,6 +35,7 @@ bool pwmIsBusy(uint8_t ch);                                            // Check 
 
 bool pwmStart(uint8_t ch);                                             // Start PWM output
 bool pwmStop(uint8_t ch);                                              // Stop PWM output
+bool pwmRunUs(uint8_t ch, uint32_t time_us);
 
 bool pwmSetGpioMode(uint8_t ch, uint32_t mode);                        // Configure PWM GPIO alternate function
 bool pwmSetPrescaler(uint8_t ch, uint32_t prescaler);                  // Apply channel prescaler

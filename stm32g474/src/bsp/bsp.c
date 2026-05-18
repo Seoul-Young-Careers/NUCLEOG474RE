@@ -50,6 +50,46 @@ void delay(uint32_t ms)
 #endif
 }
 
+void delayUs(uint32_t us)
+{
+  uint32_t tick_per_us;
+
+  if(us == 0U)
+  {
+    return;
+  }
+
+  tick_per_us = HAL_RCC_GetHCLKFreq() / 1000000U;
+  if(tick_per_us == 0U)
+  {
+    tick_per_us = 1U;
+  }
+
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+  while(us > 0U)
+  {
+    uint32_t delay_us = us;
+    uint32_t tick_start;
+    uint32_t wait_tick;
+
+    if(delay_us > 1000000U)
+    {
+      delay_us = 1000000U;
+    }
+
+    wait_tick = tick_per_us * delay_us;
+    tick_start = DWT->CYCCNT;
+
+    while((DWT->CYCCNT - tick_start) < wait_tick)
+    {
+    }
+
+    us -= delay_us;
+  }
+}
+
 uint32_t millis(void)
 {
   return HAL_GetTick();

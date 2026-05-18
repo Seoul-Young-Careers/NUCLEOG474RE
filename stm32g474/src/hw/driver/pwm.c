@@ -78,6 +78,7 @@ static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 
 #ifdef _USE_HW_CLI
 static void cliPwm(cli_args_t *args);
+static bool pwmRunUs(uint8_t ch, uint32_t time_us);
 #endif
 
 bool pwmInit(void)
@@ -379,6 +380,20 @@ bool pwmStop(uint8_t ch)
 
   return true;
 }
+bool pwmRunUs(uint8_t ch, uint32_t time_us)
+{
+  bool ret;
+
+  if(ch >= PWM_MAX_CH) return false;
+  if(time_us == 0U) return false;
+
+  ret = pwmStart(ch);
+  if(ret != true) return false;
+
+  delayUs(time_us);
+
+  return pwmStop(ch);
+}
 
 bool pwmSetGpioMode(uint8_t ch, uint32_t mode)
 {
@@ -487,109 +502,104 @@ bool pwmSetPulse(uint8_t ch, uint32_t pulse)
 
 
 #ifdef _USE_HW_CLI
+
+
 static void cliPwm(cli_args_t *args)
 {
   bool ret = false;
+  uint8_t ch;
+  uint32_t value;
+  bool cmd_ret;
 
-  if(args->argc == 1 && args->isStr(0, "show") == true)
+  if(args->argc == 1)
   {
-    for(uint8_t i = 0; i < PWM_MAX_CH; i++)
+    if(args->isStr(0, "show") == true)
     {
-      uint32_t duty = 0;
-
-      if(pwm_cfg[i].period > 0)
+      for(uint8_t i = 0; i < PWM_MAX_CH; i++)
       {
-        duty = (pwm_cfg[i].pulse * 100U) / (pwm_cfg[i].period + 1U);
+        uint32_t duty = 0;
+
+        if(pwm_cfg[i].period > 0)
+        {
+          duty = (pwm_cfg[i].pulse * 100U) / (pwm_cfg[i].period + 1U);
+        }
+
+        cliPrintf("pwm %d open:%d busy:%d psc:%lu period:%lu pulse:%lu duty:%lu%%\n",
+                  i,
+                  pwm_tbl[i].is_open,
+                  pwm_tbl[i].is_busy,
+                  pwm_cfg[i].prescaler,
+                  pwm_cfg[i].period,
+                  pwm_cfg[i].pulse,
+                  duty);
       }
 
-      cliPrintf("pwm %d open:%d busy:%d psc:%lu period:%lu pulse:%lu duty:%lu%%\n",
-                i,
-                pwm_tbl[i].is_open,
-                pwm_tbl[i].is_busy,
-                pwm_cfg[i].prescaler,
-                pwm_cfg[i].period,
-                pwm_cfg[i].pulse,
-                duty);
+      ret = true;
+    }
+  }
+
+  if(args->argc == 3)
+  {
+    ch    = (uint8_t)args->getData(1);
+    value = (uint32_t)args->getData(2);
+
+    if(args->isStr(0, "run") == true)
+    {
+      cmd_ret = pwmRunUs(ch, value);
+
+      cliPrintf("pwm run %d %luus : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
     }
 
-    ret = true;
-  }
-
-  if(args->argc == 2 && args->isStr(0, "start") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    bool cmd_ret = pwmStart(ch);
-
-    cliPrintf("pwm start %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
-    ret = true;
-  }
-
-  if(args->argc == 2 && args->isStr(0, "stop") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    bool cmd_ret = pwmStop(ch);
-
-    cliPrintf("pwm stop %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
-    ret = true;
-  }
-
-  if(args->argc == 3 && args->isStr(0, "prescaler") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    uint32_t prescaler = (uint32_t)args->getData(2);
-    bool cmd_ret = pwmSetPrescaler(ch, prescaler);
-
-    cliPrintf("pwm prescaler %d %lu : %s\n", ch, prescaler, cmd_ret ? "OK" : "FAIL");
-    ret = true;
-  }
-
-  if(args->argc == 3 && args->isStr(0, "period") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    uint32_t period = (uint32_t)args->getData(2);
-    bool cmd_ret = pwmSetPeriod(ch, period);
-
-    cliPrintf("pwm period %d %lu : %s\n", ch, period, cmd_ret ? "OK" : "FAIL");
-    ret = true;
-  }
-
-  if(args->argc == 3 && args->isStr(0, "pulse") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    uint32_t pulse = (uint32_t)args->getData(2);
-    bool cmd_ret = pwmSetPulse(ch, pulse);
-
-    cliPrintf("pwm pulse %d %lu : %s\n", ch, pulse, cmd_ret ? "OK" : "FAIL");
-    ret = true;
-  }
-
-  if(args->argc == 3 && args->isStr(0, "duty") == true)
-  {
-    uint8_t ch = (uint8_t)args->getData(1);
-    uint32_t duty = (uint32_t)args->getData(2);
-    bool cmd_ret = false;
-
-    if(ch < PWM_MAX_CH && duty <= 100U)
+    if(args->isStr(0, "prescaler") == true)
     {
-      uint32_t pulse = ((pwm_cfg[ch].period + 1U) * duty) / 100U;
+      cmd_ret = pwmSetPrescaler(ch, value);
 
-      if(pulse > 0)
+      cliPrintf("pwm prescaler %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "period") == true)
+    {
+      cmd_ret = pwmSetPeriod(ch, value);
+
+      cliPrintf("pwm period %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "pulse") == true)
+    {
+      cmd_ret = pwmSetPulse(ch, value);
+
+      cliPrintf("pwm pulse %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "duty") == true)
+    {
+      cmd_ret = false;
+
+      if(ch < PWM_MAX_CH && value <= 100U)
       {
-        pulse--;
+        uint32_t pulse = ((pwm_cfg[ch].period + 1U) * value) / 100U;
+
+        if(pulse > 0)
+        {
+          pulse--;
+        }
+
+        cmd_ret = pwmSetPulse(ch, pulse);
       }
 
-      cmd_ret = pwmSetPulse(ch, pulse);
+      cliPrintf("pwm duty %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
     }
-
-    cliPrintf("pwm duty %d %lu : %s\n", ch, duty, cmd_ret ? "OK" : "FAIL");
-    ret = true;
   }
 
   if(ret != true)
   {
     cliPrintf("pwm show\n");
-    cliPrintf("pwm start ch[0~%d]\n", PWM_MAX_CH - 1);
-    cliPrintf("pwm stop ch[0~%d]\n", PWM_MAX_CH - 1);
+    cliPrintf("pwm run ch[0~%d] time_us\n", PWM_MAX_CH - 1);
     cliPrintf("pwm prescaler ch[0~%d] value\n", PWM_MAX_CH - 1);
     cliPrintf("pwm period ch[0~%d] value\n", PWM_MAX_CH - 1);
     cliPrintf("pwm pulse ch[0~%d] value\n", PWM_MAX_CH - 1);
