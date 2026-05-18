@@ -78,7 +78,6 @@ static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 
 #ifdef _USE_HW_CLI
 static void cliPwm(cli_args_t *args);
-static bool pwmRunUs(uint8_t ch, uint32_t time_us);
 #endif
 
 bool pwmInit(void)
