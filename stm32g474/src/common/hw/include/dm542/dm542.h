@@ -16,15 +16,10 @@ extern "C" {
 
 #ifdef _USE_DM542
 
-#ifdef HW_DM542_MAX_CH
 #define DM542_MAX_CH  HW_DM542_MAX_CH
-#endif
+#define DM542_PUL			_DEF_PWM2
+#define DM542_DIR			0
 
-typedef enum
-{
-  DM542_DIR_CW = 0,
-  DM542_DIR_CCW,
-} dm542_dir_t;
 
 bool dm542Init(void);                                                         // DM542 driver init
 bool dm542Open(uint8_t ch);                                                   // Open selected DM542 channel
