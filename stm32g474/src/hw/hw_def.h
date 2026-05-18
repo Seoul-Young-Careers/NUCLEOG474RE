@@ -49,8 +49,10 @@
 #define		HW_LCD_WIDTH			160
 #define 	HW_LCD_HEIGHT     		160
 
-
 #define _USE_PWM
 #define 	HW_PWM_MAX_CH			3
+
+#define _USE_DM542
+#define		HW_DM542_MAX			1
 
 #endif /* SRC_HW_HW_DEF_H_ */
