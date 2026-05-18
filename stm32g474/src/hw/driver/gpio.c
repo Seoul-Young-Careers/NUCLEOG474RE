@@ -22,7 +22,7 @@ typedef struct
 
 button_tbl_t gpio_tbl[GPIO_MAX_CH] =
 {
-	//{GPIOA, GPIO_PIN_0, _DEF_INPUT , GPIO_PIN_SET, GPIO_PIN_RESET, _DEF_LOW},  		  // 0. VS1053_DREQ
+	{GPIOA, GPIO_PIN_7, _DEF_OUTPUT_OPENDRAIN , GPIO_PIN_SET, GPIO_PIN_RESET, _DEF_LOW},  		  // 0. VS1053_DREQ
 
 
 };
@@ -73,7 +73,6 @@ bool gpioPinMode(uint8_t ch, uint8_t mode)
 		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
 		break;
-
 	case _DEF_OUTPUT_PULLUP:
 		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 		GPIO_InitStruct.Pull = GPIO_PULLUP;
@@ -81,6 +80,10 @@ bool gpioPinMode(uint8_t ch, uint8_t mode)
 	case _DEF_OUTPUT_PULLDOWN:
 		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 		GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+		break;
+	case _DEF_OUTPUT_OPENDRAIN:
+		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
 		break;
 	}
 
