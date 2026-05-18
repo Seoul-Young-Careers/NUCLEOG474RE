@@ -20,4 +20,5 @@ void hwInit(void)
   gpioInit();
   pwmInit();
 
+  dm542Init();
 }

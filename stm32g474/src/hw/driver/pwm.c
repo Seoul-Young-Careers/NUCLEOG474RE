@@ -90,11 +90,6 @@ bool pwmInit(void)
     pwm_tbl[i].is_busy       = false;
     pwm_tbl[i].is_count_mode = false;
     pwm_tbl[i].remain_count  = 0;
-
-    if(pwmOpen(i) != true)
-    {
-      ret = false;
-    }
   }
 
 #ifdef _USE_HW_CLI
