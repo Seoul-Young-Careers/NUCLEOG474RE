@@ -17,12 +17,13 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
+#define od 			GPIO_MODE_AF_OD
+#define pp			GPIO_MODE_AF_PP
+
 typedef struct
 {
   TIM_HandleTypeDef *p_tim;
-  TIM_TypeDef *instance;
-  uint32_t tim_channel;
-  IRQn_Type irq_num;
+  uint32_t channel;
 
   bool is_open;
   bool is_busy;
@@ -41,9 +42,7 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
 {
   {
     .p_tim          = &htim2,
-    .instance       = TIM2,
-    .tim_channel    = TIM_CHANNEL_1,
-    .irq_num        = TIM2_IRQn,
+    .channel        = TIM_CHANNEL_1,
 
     .is_open        = false,
     .is_busy        = false,
@@ -52,9 +51,7 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
   },
   {
     .p_tim          = &htim3,
-    .instance       = TIM3,
-    .tim_channel    = TIM_CHANNEL_1,
-    .irq_num        = TIM3_IRQn,
+    .channel        = TIM_CHANNEL_1,
 
     .is_open        = false,
     .is_busy        = false,
@@ -63,9 +60,7 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
   },
   {
     .p_tim          = &htim4,
-    .instance       = TIM4,
-    .tim_channel    = TIM_CHANNEL_1,
-    .irq_num        = TIM4_IRQn,
+    .channel        = TIM_CHANNEL_1,
 
     .is_open        = false,
     .is_busy        = false,
@@ -84,8 +79,6 @@ static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 #ifdef _USE_HW_CLI
 static void cliPwm(cli_args_t *args);
 #endif
-
-static bool pwmEnableTimerClock(uint8_t ch);
 
 bool pwmInit(void)
 {
@@ -117,21 +110,15 @@ bool pwmOpen(uint8_t ch)
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
 
-  if(ch >= PWM_MAX_CH)
-  {
-    return false;
-  }
+  if(ch >= PWM_MAX_CH)		return false;
+  if(pwm_tbl[ch].is_open == true) return true;
 
   p_tim = pwm_tbl[ch].p_tim;
 
-  if(p_tim->Instance == NULL)
+  switch(ch)
   {
-    if(pwmEnableTimerClock(ch) != true)
-    {
-      return false;
-    }
-
-    p_tim->Instance               = pwm_tbl[ch].instance;
+  case _DEF_PWM1 :
+	p_tim->Instance 			  = TIM2;
     p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
     p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
     p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -158,20 +145,192 @@ bool pwmOpen(uint8_t ch)
     sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
     sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 
-    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].tim_channel) != HAL_OK)
+    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].channel) != HAL_OK)
     {
       p_tim->Instance = NULL;
       return false;
     }
 
-    pwmSetGpioMode(ch, GPIO_MODE_AF_PP);
-    HAL_NVIC_SetPriority(pwm_tbl[ch].irq_num, 5, 0);
-    HAL_NVIC_EnableIRQ(pwm_tbl[ch].irq_num);
-  }
+    pwmSetGpioMode(ch, od);
 
   pwm_tbl[ch].is_open = true;
+  break;
+  case _DEF_PWM2:
+		p_tim->Instance 			  = TIM3;
+	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
+	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
+	    p_tim->Init.Period            = pwm_cfg[ch].period;
+	    p_tim->Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+	    p_tim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+	    if(HAL_TIM_PWM_Init(p_tim) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+	    if(HAL_TIMEx_MasterConfigSynchronization(p_tim, &sMasterConfig) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    sConfigOC.OCMode     = TIM_OCMODE_PWM1;
+	    sConfigOC.Pulse      = pwm_cfg[ch].pulse;
+	    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+	    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].channel) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    pwmSetGpioMode(ch, od);
+
+	  pwm_tbl[ch].is_open = true;
+	  break;
+  case _DEF_PWM3:
+		p_tim->Instance 			  = TIM4;
+	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
+	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
+	    p_tim->Init.Period            = pwm_cfg[ch].period;
+	    p_tim->Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+	    p_tim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+	    if(HAL_TIM_PWM_Init(p_tim) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+	    if(HAL_TIMEx_MasterConfigSynchronization(p_tim, &sMasterConfig) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    sConfigOC.OCMode     = TIM_OCMODE_PWM1;
+	    sConfigOC.Pulse      = pwm_cfg[ch].pulse;
+	    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+	    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].channel) != HAL_OK)
+	    {
+	      p_tim->Instance = NULL;
+	      return false;
+	    }
+
+	    pwmSetGpioMode(ch, od);
+
+	  pwm_tbl[ch].is_open = true;
+	  break;
+  }
 
   return true;
+}
+
+void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle)
+{
+
+  if(tim_pwmHandle->Instance==TIM2)
+  {
+  /* USER CODE BEGIN TIM2_MspInit 0 */
+
+  /* USER CODE END TIM2_MspInit 0 */
+    /* TIM2 clock enable */
+    __HAL_RCC_TIM2_CLK_ENABLE();
+
+    /* TIM2 interrupt Init */
+    HAL_NVIC_SetPriority(TIM2_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+  /* USER CODE BEGIN TIM2_MspInit 1 */
+
+  /* USER CODE END TIM2_MspInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM3)
+  {
+  /* USER CODE BEGIN TIM3_MspInit 0 */
+
+  /* USER CODE END TIM3_MspInit 0 */
+    /* TIM3 clock enable */
+    __HAL_RCC_TIM3_CLK_ENABLE();
+
+    /* TIM3 interrupt Init */
+    HAL_NVIC_SetPriority(TIM3_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM3_IRQn);
+  /* USER CODE BEGIN TIM3_MspInit 1 */
+
+  /* USER CODE END TIM3_MspInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM4)
+  {
+  /* USER CODE BEGIN TIM4_MspInit 0 */
+
+  /* USER CODE END TIM4_MspInit 0 */
+    /* TIM4 clock enable */
+    __HAL_RCC_TIM4_CLK_ENABLE();
+
+    /* TIM4 interrupt Init */
+    HAL_NVIC_SetPriority(TIM4_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+  /* USER CODE BEGIN TIM4_MspInit 1 */
+
+  /* USER CODE END TIM4_MspInit 1 */
+  }
+}
+
+void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* tim_pwmHandle)
+{
+
+  if(tim_pwmHandle->Instance==TIM2)
+  {
+  /* USER CODE BEGIN TIM2_MspDeInit 0 */
+
+  /* USER CODE END TIM2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM2_CLK_DISABLE();
+
+    /* TIM2 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(TIM2_IRQn);
+  /* USER CODE BEGIN TIM2_MspDeInit 1 */
+
+  /* USER CODE END TIM2_MspDeInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM3)
+  {
+  /* USER CODE BEGIN TIM3_MspDeInit 0 */
+
+  /* USER CODE END TIM3_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM3_CLK_DISABLE();
+
+    /* TIM3 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(TIM3_IRQn);
+  /* USER CODE BEGIN TIM3_MspDeInit 1 */
+
+  /* USER CODE END TIM3_MspDeInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM4)
+  {
+  /* USER CODE BEGIN TIM4_MspDeInit 0 */
+
+  /* USER CODE END TIM4_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM4_CLK_DISABLE();
+
+    /* TIM4 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(TIM4_IRQn);
+  /* USER CODE BEGIN TIM4_MspDeInit 1 */
+
+  /* USER CODE END TIM4_MspDeInit 1 */
+  }
 }
 
 bool pwmIsOpen(uint8_t ch)
@@ -198,7 +357,7 @@ bool pwmStart(uint8_t ch)
   p_tim = pwm_tbl[ch].p_tim;
   __HAL_TIM_SET_COUNTER(p_tim, 0);
 
-  if(HAL_TIM_PWM_Start(p_tim, pwm_tbl[ch].tim_channel) != HAL_OK) return false;
+  if(HAL_TIM_PWM_Start(p_tim, pwm_tbl[ch].channel) != HAL_OK) return false;
 
   pwm_tbl[ch].is_busy = true;
 
@@ -214,7 +373,7 @@ bool pwmStop(uint8_t ch)
 
   p_tim = pwm_tbl[ch].p_tim;
 
-  if(HAL_TIM_PWM_Stop(p_tim, pwm_tbl[ch].tim_channel) != HAL_OK) return false;
+  if(HAL_TIM_PWM_Stop(p_tim, pwm_tbl[ch].channel) != HAL_OK) return false;
 
   pwm_tbl[ch].is_busy = false;
 
@@ -234,22 +393,28 @@ bool pwmSetGpioMode(uint8_t ch, uint32_t mode)
   switch(ch)
   {
     case _DEF_PWM1:
-      __HAL_RCC_GPIOA_CLK_ENABLE();
       GPIO_InitStruct.Pin       = GPIO_PIN_0;
+      GPIO_InitStruct.Mode 		= mode;
+      GPIO_InitStruct.Pull 		= GPIO_NOPULL;
+      GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;
       GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
       HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
       break;
 
     case _DEF_PWM2:
-      __HAL_RCC_GPIOA_CLK_ENABLE();
       GPIO_InitStruct.Pin       = GPIO_PIN_6;
+      GPIO_InitStruct.Mode		= mode;
+      GPIO_InitStruct.Pull 		= GPIO_NOPULL;
+      GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;
       GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
       HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
       break;
 
     case _DEF_PWM3:
-      __HAL_RCC_GPIOB_CLK_ENABLE();
       GPIO_InitStruct.Pin       = GPIO_PIN_6;
+      GPIO_InitStruct.Mode 		= mode;
+      GPIO_InitStruct.Pull 		= GPIO_NOPULL;
+      GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;
       GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
       HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
       break;
@@ -305,7 +470,6 @@ bool pwmSetPeriod(uint8_t ch, uint32_t period)
 bool pwmSetPulse(uint8_t ch, uint32_t pulse)
 {
   TIM_HandleTypeDef *p_tim;
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   if(ch >= PWM_MAX_CH) return false;
   if(pulse > pwm_cfg[ch].period) return false;
@@ -316,40 +480,11 @@ bool pwmSetPulse(uint8_t ch, uint32_t pulse)
 
   pwm_cfg[ch].pulse = pulse;
 
-  sConfigOC.OCMode     = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse      = pulse;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-
-  if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].tim_channel) != HAL_OK)
-  {
-    return false;
-  }
-
-  __HAL_TIM_SET_COMPARE(p_tim, pwm_tbl[ch].tim_channel, pulse);
+  __HAL_TIM_SET_COMPARE(p_tim, pwm_tbl[ch].channel, pulse);
 
   return true;
 }
 
-static bool pwmEnableTimerClock(uint8_t ch)
-{
-  switch(ch)
-  {
-    case _DEF_PWM1:
-      __HAL_RCC_TIM2_CLK_ENABLE();
-      return true;
-
-    case _DEF_PWM2:
-      __HAL_RCC_TIM3_CLK_ENABLE();
-      return true;
-
-    case _DEF_PWM3:
-      __HAL_RCC_TIM4_CLK_ENABLE();
-      return true;
-  }
-
-  return false;
-}
 
 #ifdef _USE_HW_CLI
 static void cliPwm(cli_args_t *args)
