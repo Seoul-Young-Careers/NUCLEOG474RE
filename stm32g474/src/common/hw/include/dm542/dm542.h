@@ -16,7 +16,7 @@ extern "C" {
 
 #ifdef _USE_DM542
 
-#define DM542_MAX_CH  HW_DM542_MAX_CH
+#define DM542_MAX_CH 		 HW_DM542_MAX
 #define DM542_PUL			_DEF_PWM2
 #define DM542_DIR			0
 
@@ -30,9 +30,6 @@ bool dm542IsEnabled(uint8_t ch);                                              //
 
 bool dm542Enable(uint8_t ch);                                                 // Enable motor driver output
 bool dm542Disable(uint8_t ch);                                                // Disable motor driver output
-
-bool dm542SetDir(uint8_t ch, dm542_dir_t dir);                                // Set motor rotation direction
-bool dm542GetDir(uint8_t ch, dm542_dir_t *p_dir);                             // Get motor rotation direction
 
 bool dm542Start(uint8_t ch);                                                  // Start step pulse PWM output
 bool dm542Stop(uint8_t ch);                                                   // Stop step pulse PWM output
