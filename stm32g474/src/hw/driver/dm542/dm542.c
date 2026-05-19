@@ -54,12 +54,14 @@ bool dm542Init(void)
     dm542_tbl[i].is_enabled    = false;
     dm542_tbl[i].position_step = 0;
     dm542_tbl[i].remain_step   = 0;
+
+    if(dm542Open(i) != true)
+    {
+      ret = false;
+    }
   }
 
-  if(dm542Open(DM542_PUL) != true)
-  {
-    ret = false;
-  }
+
   return ret;
 }
 

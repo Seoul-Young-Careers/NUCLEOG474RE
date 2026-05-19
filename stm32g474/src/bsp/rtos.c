@@ -8,7 +8,64 @@
 #include "rtos.h"
 #include "bsp.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 TIM_HandleTypeDef        htim7;
+
+static StaticTask_t mainThread_cb;
+static StackType_t  mainThread_stack[_HW_DEF_RTOS_THREAD_MEM_MAIN / sizeof(StackType_t)];
+
+static const osThreadAttr_t mainThread_attributes =
+{
+  .name       = "mainThread",
+  .cb_mem     = &mainThread_cb,
+  .cb_size    = sizeof(mainThread_cb),
+  .stack_mem  = mainThread_stack,
+  .stack_size = sizeof(mainThread_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_MAIN,
+};
+
+static StaticTask_t threadLed_cb;
+static StackType_t  threadLed_stack[_HW_DEF_RTOS_THREAD_MEM_LED / sizeof(StackType_t)];
+
+static const osThreadAttr_t threadLed_attributes =
+{
+  .name       = "threadLed",
+  .cb_mem     = &threadLed_cb,
+  .cb_size    = sizeof(threadLed_cb),
+  .stack_mem  = threadLed_stack,
+  .stack_size = sizeof(threadLed_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_LED,
+};
+
+static StaticTask_t threadMotor_cb;
+static StackType_t  threadMotor_stack[_HW_DEF_RTOS_THREAD_MEM_MOTOR / sizeof(StackType_t)];
+
+static const osThreadAttr_t threadMotor_attributes =
+{
+  .name       = "threadMotor",
+  .cb_mem     = &threadMotor_cb,
+  .cb_size    = sizeof(threadMotor_cb),
+  .stack_mem  = threadMotor_stack,
+  .stack_size = sizeof(threadMotor_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_MOTOR,
+};
+
+const osThreadAttr_t *rtosGetMainThreadAttr(void)
+{
+  return &mainThread_attributes;
+}
+
+const osThreadAttr_t *rtosGetLedThreadAttr(void)
+{
+  return &threadLed_attributes;
+}
+
+const osThreadAttr_t *rtosGetMotorThreadAttr(void)
+{
+  return &threadMotor_attributes;
+}
 
 bool rtosInit(void)
 {

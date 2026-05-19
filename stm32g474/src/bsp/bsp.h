@@ -8,10 +8,10 @@
 #ifndef SRC_BSP_BSP_H_
 #define SRC_BSP_BSP_H_
 
-
 #include "def.h"
 
 #include "cmsis_os2.h"
+#include "rtos.h"
 
 #define _USE_LOG_PRINT    1
 
