@@ -29,7 +29,6 @@ typedef struct
 {
   bool is_open;
   bool is_busy;
-  bool is_enabled;
 
   int32_t position_step;
   uint32_t remain_step;
@@ -40,7 +39,6 @@ static dm542_tbl_t dm542_tbl[DM542_MAX_CH] =
   {
     .is_open        = false,
     .is_busy        = false,
-    .is_enabled     = false,
 
     .position_step  = 0,
     .remain_step    = 0,
@@ -55,7 +53,6 @@ bool dm542Init(void)
   {
     dm542_tbl[i].is_open       = false;
     dm542_tbl[i].is_busy       = false;
-    dm542_tbl[i].is_enabled    = false;
     dm542_tbl[i].position_step = 0;
     dm542_tbl[i].remain_step   = 0;
 
@@ -83,7 +80,6 @@ bool dm542Open(uint8_t ch)
   }
 
   dm542_tbl[ch].is_busy       = false;
-  dm542_tbl[ch].is_enabled    = false;
   dm542_tbl[ch].position_step = 0;
   dm542_tbl[ch].remain_step   = 0;
   dm542_tbl[ch].is_open       = true;
@@ -105,38 +101,10 @@ bool dm542IsBusy(uint8_t ch)
   return dm542_tbl[ch].is_busy;
 }
 
-bool dm542IsEnabled(uint8_t ch)
-{
-  if(ch >= DM542_MAX_CH)  return false;
-
-  return dm542_tbl[ch].is_enabled;
-}
-
-bool dm542Enable(uint8_t ch)
-{
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
-
-  dm542_tbl[ch].is_enabled = true;
-
-  return true;
-}
-
-bool dm542Disable(uint8_t ch)
-{
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
-
-  dm542_tbl[ch].is_enabled = false;
-
-  return true;
-}
-
 bool dm542Start(uint8_t ch)
 {
   if(ch >= DM542_MAX_CH) return false;
   if(dm542_tbl[ch].is_open != true) return false;
-  if(dm542_tbl[ch].is_enabled != true) return false;
 
   if(pwmStart(DM542_PUL) != true)
   {
@@ -169,7 +137,6 @@ bool dm542Step(uint8_t ch)
 
   if(ch >= DM542_MAX_CH) return false;
   if(dm542_tbl[ch].is_open != true) return false;
-  if(dm542_tbl[ch].is_enabled != true) return false;
   if(dm542_tbl[ch].is_busy == true) return false;
 
   dm542_tbl[ch].is_busy     = true;
@@ -251,7 +218,6 @@ bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
 
   if(ch >= DM542_MAX_CH) return false;
   if(dm542_tbl[ch].is_open != true) return false;
-  if(dm542_tbl[ch].is_enabled != true) return false;
   if(dm542_tbl[ch].is_busy == true) return false;
   if(pulse_delay_us == 0U) return false;
 
@@ -335,11 +301,10 @@ static void cliDm542(cli_args_t *args)
     {
       for(uint8_t i = 0; i < DM542_MAX_CH; i++)
       {
-        cliPrintf("dm542 %d open:%d busy:%d enable:%d pos:%ld remain:%lu\n",
+        cliPrintf("dm542 %d open:%d busy:%d pos:%ld remain:%lu\n",
                   i,
                   dm542_tbl[i].is_open,
                   dm542_tbl[i].is_busy,
-                  dm542_tbl[i].is_enabled,
                   (long)dm542_tbl[i].position_step,
                   dm542_tbl[i].remain_step);
       }
@@ -356,20 +321,6 @@ static void cliDm542(cli_args_t *args)
     {
       cmd_ret = dm542Open(ch);
       cliPrintf("dm542 open %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
-      ret = true;
-    }
-
-    if(args->isStr(0, "enable") == true)
-    {
-      cmd_ret = dm542Enable(ch);
-      cliPrintf("dm542 enable %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
-      ret = true;
-    }
-
-    if(args->isStr(0, "disable") == true)
-    {
-      cmd_ret = dm542Disable(ch);
-      cliPrintf("dm542 disable %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
       ret = true;
     }
 
@@ -430,8 +381,6 @@ static void cliDm542(cli_args_t *args)
   {
     cliPrintf("dm542 show\n");
     cliPrintf("dm542 open ch[0~%d]\n", DM542_MAX_CH - 1);
-    cliPrintf("dm542 enable ch[0~%d]\n", DM542_MAX_CH - 1);
-    cliPrintf("dm542 disable ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 step ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 start ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 stop ch[0~%d]\n", DM542_MAX_CH - 1);

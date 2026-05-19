@@ -26,10 +26,6 @@ bool dm542Open(uint8_t ch);                                                   //
 
 bool dm542IsOpen(uint8_t ch);                                                 // Check channel open state
 bool dm542IsBusy(uint8_t ch);                                                 // Check motor output running state
-bool dm542IsEnabled(uint8_t ch);                                              // Check driver enable state
-
-bool dm542Enable(uint8_t ch);                                                 // Enable motor driver output
-bool dm542Disable(uint8_t ch);                                                // Disable motor driver output
 
 bool dm542Start(uint8_t ch);                                                  // Start step pulse PWM output
 bool dm542Stop(uint8_t ch);                                                   // Stop step pulse PWM output
