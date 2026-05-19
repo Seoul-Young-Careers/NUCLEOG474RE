@@ -13,6 +13,10 @@
 
 #ifdef _USE_DM542
 
+#ifdef _USE_HW_CLI
+static void cliDm542(cli_args_t *args);
+#endif
+
 #ifndef DM542_STEP_PULSE_US
 #define DM542_STEP_PULSE_US             10U
 #endif
@@ -61,6 +65,9 @@ bool dm542Init(void)
     }
   }
 
+#ifdef _USE_HW_CLI
+  cliAdd("dm542", cliDm542);
+#endif
 
   return ret;
 }
@@ -312,5 +319,126 @@ bool dm542MoveMm(uint8_t ch, float mm, uint32_t pulse_delay_us)
 
   return dm542MoveStep(ch, step, pulse_delay_us);
 }
+
+#ifdef _USE_HW_CLI
+static void cliDm542(cli_args_t *args)
+{
+  bool ret = false;
+  bool cmd_ret;
+  uint8_t ch;
+  int32_t step;
+  uint32_t value;
+
+  if(args->argc == 1)
+  {
+    if(args->isStr(0, "show") == true)
+    {
+      for(uint8_t i = 0; i < DM542_MAX_CH; i++)
+      {
+        cliPrintf("dm542 %d open:%d busy:%d enable:%d pos:%ld remain:%lu\n",
+                  i,
+                  dm542_tbl[i].is_open,
+                  dm542_tbl[i].is_busy,
+                  dm542_tbl[i].is_enabled,
+                  (long)dm542_tbl[i].position_step,
+                  dm542_tbl[i].remain_step);
+      }
+
+      ret = true;
+    }
+  }
+
+  if(args->argc == 2)
+  {
+    ch = (uint8_t)args->getData(1);
+
+    if(args->isStr(0, "open") == true)
+    {
+      cmd_ret = dm542Open(ch);
+      cliPrintf("dm542 open %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "enable") == true)
+    {
+      cmd_ret = dm542Enable(ch);
+      cliPrintf("dm542 enable %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "disable") == true)
+    {
+      cmd_ret = dm542Disable(ch);
+      cliPrintf("dm542 disable %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "step") == true)
+    {
+      cmd_ret = dm542Step(ch);
+      cliPrintf("dm542 step %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "start") == true)
+    {
+      cmd_ret = dm542Start(ch);
+      cliPrintf("dm542 start %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "stop") == true)
+    {
+      cmd_ret = dm542Stop(ch);
+      cliPrintf("dm542 stop %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+  }
+
+  if(args->argc == 3)
+  {
+    ch    = (uint8_t)args->getData(1);
+    value = (uint32_t)args->getData(2);
+
+    if(args->isStr(0, "freq") == true)
+    {
+      cmd_ret = dm542SetFreq(ch, value);
+      cliPrintf("dm542 freq %d %luhz : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+  }
+
+  if(args->argc == 4)
+  {
+    ch    = (uint8_t)args->getData(1);
+    step  = args->getData(2);
+    value = (uint32_t)args->getData(3);
+
+    if(args->isStr(0, "move") == true)
+    {
+      cmd_ret = dm542MoveStep(ch, step, value);
+      cliPrintf("dm542 move %d %ld %luus : %s\n",
+                ch,
+                (long)step,
+                value,
+                cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+  }
+
+  if(ret != true)
+  {
+    cliPrintf("dm542 show\n");
+    cliPrintf("dm542 open ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 enable ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 disable ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 step ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 start ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 stop ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 freq ch[0~%d] hz\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 move ch[0~%d] step pulse_delay_us\n", DM542_MAX_CH - 1);
+  }
+}
+#endif
 
 #endif
