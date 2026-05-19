@@ -11,6 +11,7 @@
 
 void DMA1_Channel1_IRQHandler(void);
 void TIM7_DAC_IRQHandler(void);
+void SystemClock_Config(void);
 
 void DMA1_CH1_IRQHandler(void)
 {
@@ -22,7 +23,7 @@ void TIM7_IRQHandler(void)
   TIM7_DAC_IRQHandler();
 }
 
-void SystemClock_Config(void);
+
 
 void bspInit(void)
 {
@@ -37,7 +38,7 @@ void bspInit(void)
 void delay(uint32_t ms)
 {
 #ifdef _USE_HW_RTOS
-  if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
+  if (osKernelGetState() == osKernelRunning)
   {
     osDelay(ms);
   }

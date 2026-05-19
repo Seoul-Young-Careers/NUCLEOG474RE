@@ -11,6 +11,7 @@
 
 #include "def.h"
 
+#include "cmsis_os2.h"
 
 #define _USE_LOG_PRINT    1
 
