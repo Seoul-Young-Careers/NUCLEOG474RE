@@ -52,6 +52,18 @@ static const osThreadAttr_t threadMotor_attributes =
   .priority   = _HW_DEF_RTOS_THREAD_PRI_MOTOR,
 };
 
+static StaticQueue_t motorMsgQ_cb;
+static uint8_t       motorMsgQ_buf[_HW_DEF_RTOS_MSG_Q_MOTOR * sizeof(rtos_motor_msg_t)];
+
+static const osMessageQueueAttr_t motorMsgQ_attributes =
+{
+  .name    = "motorMsgQ",
+  .cb_mem  = &motorMsgQ_cb,
+  .cb_size = sizeof(motorMsgQ_cb),
+  .mq_mem  = motorMsgQ_buf,
+  .mq_size = sizeof(motorMsgQ_buf),
+};
+
 const osThreadAttr_t *rtosGetMainThreadAttr(void)
 {
   return &mainThread_attributes;
@@ -65,6 +77,11 @@ const osThreadAttr_t *rtosGetLedThreadAttr(void)
 const osThreadAttr_t *rtosGetMotorThreadAttr(void)
 {
   return &threadMotor_attributes;
+}
+
+const osMessageQueueAttr_t *rtosGetMotorMsgQAttr(void)
+{
+  return &motorMsgQ_attributes;
 }
 
 bool rtosInit(void)
