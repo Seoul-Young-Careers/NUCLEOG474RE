@@ -18,6 +18,7 @@
 #include "gpio.h"
 #include "pwm.h"
 #include "dm542/dm542.h"
+#include "loadcell/hx711.h"
 
 void hwInit(void);
 

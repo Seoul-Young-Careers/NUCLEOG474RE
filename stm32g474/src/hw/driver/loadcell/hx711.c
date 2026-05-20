@@ -5,7 +5,7 @@
  *      Author: young
  */
 
-#include "loadcell/loadcell.h"
+#include <loadcell/hx711.h>
 
 typedef struct
 {
@@ -16,15 +16,8 @@ typedef struct
   uint16_t sample_count;
 } loadcell_tbl_t;
 
-typedef struct
-{
-  int32_t raw;                          // Latest raw ADC count
-  int32_t offset;                       // Tare offset in raw ADC count
-  float scale;                          // Raw-count-to-gram scale factor
-  float gram;                           // Converted weight in grams
-} loadcell_data_t;
 
-static loadcell_tbl_t loadcell_tbl[LOADCELL_MAX];
+static loadcell_tbl_t loadcell_tbl[HX711_MAX];
 
 static bool loadcellIsValidCh(uint8_t ch);
 static bool loadcellReadRawHw(uint8_t ch, int32_t *p_raw);
@@ -32,7 +25,7 @@ static bool loadcellReadAverageRaw(uint8_t ch, uint16_t sample_count, int32_t *p
 
 bool loadcellInit(void)
 {
-  for(uint8_t i = 0; i < LOADCELL_MAX_CH; i++)
+  for(uint8_t i = 0; i < HX711_MAX; i++)
   {
     loadcell_tbl[i].is_open      = false;
     loadcell_tbl[i].is_ready     = false;
@@ -179,7 +172,7 @@ uint16_t loadcellGetSampleCount(uint8_t ch)
 
 static bool loadcellIsValidCh(uint8_t ch)
 {
-  return ch < LOADCELL_MAX_CH;
+  return ch < HX711_MAX;
 }
 
 static bool loadcellReadRawHw(uint8_t ch, int32_t *p_raw)

@@ -10,6 +10,7 @@
 
 static void threadLed(void *argument);
 static void threadMotor(void *argument);
+static void threadLoadcell(void *argument);
 
 static osMessageQueueId_t motor_msg_q;
 
@@ -106,5 +107,32 @@ static void threadMotor(void *argument)
           break;
       }
     }
+  }
+}
+
+static void threadLoadcell(void *argument)
+{
+  float gram;
+
+  UNUSED(argument);
+
+  loadcellOpen(0);
+  loadcellTare(0, 20);
+  loadcellSetScale(0, 1.0f);
+
+  while (1)
+  {
+    if (loadcellReadGram(0, &gram) == true)
+    {
+      // lcdClear();
+      // lcdPrintf(0, 0, "Weight");
+      // lcdPrintf(0, 20, "%.1f g", gram);
+    }
+    else
+    {
+      // lcdPrintf(0, 0, "Loadcell Error");
+    }
+
+    osDelay(100);
   }
 }

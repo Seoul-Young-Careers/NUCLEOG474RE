@@ -5,8 +5,8 @@
  *      Author: young
  */
 
-#ifndef SRC_COMMON_HW_INCLUDE_LOADCELL_LOADCELL_H_
-#define SRC_COMMON_HW_INCLUDE_LOADCELL_LOADCELL_H_
+#ifndef SRC_COMMON_HW_INCLUDE_LOADCELL_HX711_H_
+#define SRC_COMMON_HW_INCLUDE_LOADCELL_HX711_H_
 
 #include "hw_def.h"
 
@@ -14,11 +14,19 @@
 extern "C" {
 #endif
 
-#define LOADCELL_MAX										HW_LOADCELL_MAX
+#ifdef _USE_HX711
+#define HX711_MAX										HW_HX711_MAX
 
 #define LOADCELL_DEFAULT_SAMPLE_COUNT   10U
 #define LOADCELL_DEFAULT_SCALE          1.0f
 
+	typedef struct
+	{
+	  int32_t raw;                          // Latest raw ADC count
+	  int32_t offset;                       // Tare offset in raw ADC count
+	  float scale;                          // Raw-count-to-gram scale factor
+	  float gram;                           // Converted weight in grams
+	} loadcell_data_t;
 
 
 bool loadcellInit(void);                                                // Reset loadcell module state
@@ -45,4 +53,6 @@ uint16_t loadcellGetSampleCount(uint8_t ch);                            // Get d
 }
 #endif
 
-#endif /* SRC_COMMON_HW_INCLUDE_LOADCELL_LOADCELL_H_ */
+#endif
+
+#endif /* SRC_COMMON_HW_INCLUDE_LOADCELL_HX711_H_ */

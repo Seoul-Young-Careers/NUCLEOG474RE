@@ -44,8 +44,8 @@
 #define _USE_DM542
 #define		HW_DM542_MAX			1
 
-#define _USE_LOADCELL
-#define 	HW_LOADCELL_MAX		1
+#define _USE_HX711
+#define 	HW_HX711_MAX			1
 
 
 #endif /* SRC_HW_HW_DEF_H_ */
