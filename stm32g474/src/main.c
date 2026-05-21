@@ -39,5 +39,6 @@ static void mainThread(void *argument)
 
   hwInit();
   apInit();
+
   apMain();
 }

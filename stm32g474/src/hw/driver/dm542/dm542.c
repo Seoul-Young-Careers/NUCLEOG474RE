@@ -266,7 +266,6 @@ static void cliDm542(cli_args_t *args)
   bool ret = false;
   bool cmd_ret;
   uint8_t ch;
-  int32_t step;
   uint32_t value;
 
   if(args->argc == 1)
@@ -326,40 +325,6 @@ static void cliDm542(cli_args_t *args)
     }
   }
 
-  if(args->argc == 4)
-  {
-    ch    = (uint8_t)args->getData(1);
-    step  = args->getData(2);
-    value = (uint32_t)args->getData(3);
-
-    if(args->isStr(0, "move") == true)
-    {
-      cmd_ret = dm542MoveStep(ch, step, value);
-      cliPrintf("dm542 move %d %ld %luus : %s\n",
-                ch,
-                (long)step,
-                value,
-                cmd_ret ? "OK" : "FAIL");
-      ret = true;
-    }
-  }
-
-  if(args->argc == 3)
-  {
-    ch    = (uint8_t)args->getData(1);
-    step  = args->getData(2);
-
-    if(args->isStr(0, "run") == true)
-    {
-      cmd_ret = dm542MoveStep(ch, step, 1000);
-      cliPrintf("dm542 move %d %ld us : %s\n",
-                ch,
-                (long)step,
-                cmd_ret ? "OK" : "FAIL");
-      ret = true;
-    }
-  }
-
   if(ret != true)
   {
     cliPrintf("dm542 show\n");
@@ -367,8 +332,6 @@ static void cliDm542(cli_args_t *args)
     cliPrintf("dm542 start ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 stop ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 freq ch[0~%d] hz\n", DM542_MAX_CH - 1);
-    cliPrintf("dm542 move ch[0~%d] step pulse_delay_us\n", DM542_MAX_CH - 1);
-    cliPrintf("dm542 run  ch[0~%d] step\n", DM542_MAX_CH - 1);
   }
 }
 #endif

@@ -38,6 +38,8 @@ static int32_t ds3120mgFloatToTenth(float value);
 
 bool ds3120mgInit(void)
 {
+  bool ret = true;
+
   for(uint8_t i = 0; i < DS3120MG_MAX_CH; i++)
   {
     ds3120mg_tbl[i].is_open       = false;
@@ -49,13 +51,19 @@ bool ds3120mgInit(void)
     ds3120mg_tbl[i].pulse_us      = DS3120MG_MID_PULSE_US;
     ds3120mg_tbl[i].angle_deg     = DS3120MG_DEFAULT_ANGLE_DEG;
     ds3120mg_tbl[i].max_angle_deg = DS3120MG_MAX_ANGLE_DEG;
+
+    if(ds3120mgOpen(i) != true)
+    {
+      ret = false;
+    }
   }
 
 #ifdef _USE_HW_CLI
   cliAdd("ds3120mg", cliDs3120mg);
+  cliAdd("servo", cliDs3120mg);
 #endif
 
-  return true;
+  return ret;
 }
 
 bool ds3120mgOpen(uint8_t ch)
@@ -63,7 +71,7 @@ bool ds3120mgOpen(uint8_t ch)
   if(ch >= DS3120MG_MAX_CH) return false;
   if(ds3120mg_tbl[ch].is_open == true) return true;
 
-  if(pwmOpen(DS3120MG_PWM_CH) != true)
+  if(pwmOpen(DS3120MG_PWM) != true)
   {
     return false;
   }
@@ -98,7 +106,7 @@ bool ds3120mgStart(uint8_t ch)
 	if(ch >= DS3120MG_MAX_CH) return false;
   if(ds3120mg_tbl[ch].is_open != true) return false;
 
-  if(pwmStart(DS3120MG_PWM_CH) != true)
+  if(pwmStart(DS3120MG_PWM) != true)
   {
     return false;
   }
@@ -113,7 +121,7 @@ bool ds3120mgStop(uint8_t ch)
 	if(ch >= DS3120MG_MAX_CH) return false;
   if(ds3120mg_tbl[ch].is_open != true) return false;
 
-  if(pwmStop(DS3120MG_PWM_CH) != true)
+  if(pwmStop(DS3120MG_PWM) != true)
   {
     return false;
   }
@@ -152,7 +160,7 @@ bool ds3120mgSetPulseUs(uint8_t ch, uint16_t pulse_us)
   if(pulse_us < ds3120mg_tbl[ch].min_pulse_us) return false;
   if(pulse_us > ds3120mg_tbl[ch].max_pulse_us) return false;
 
-  if(pwmSetPulse(DS3120MG_PWM_CH, pulse_us) != true)
+  if(pwmSetPulse(DS3120MG_PWM, pulse_us) != true)
   {
     return false;
   }
@@ -181,14 +189,14 @@ bool ds3120mgCenter(uint8_t ch)
 
 uint16_t ds3120mgGetPulseUs(uint8_t ch)
 {
-	if(ch >= DS3120MG_MAX_CH) return false;
+	if(ch >= DS3120MG_MAX_CH) return 0U;
 
   return ds3120mg_tbl[ch].pulse_us;
 }
 
 float ds3120mgGetAngle(uint8_t ch)
 {
-	if(ch >= DS3120MG_MAX_CH) return false;
+	if(ch >= DS3120MG_MAX_CH) return 0.0f;
 
   return ds3120mg_tbl[ch].angle_deg;
 }
@@ -248,9 +256,9 @@ static bool ds3120mgApplyPwmConfig(uint8_t ch)
   if(period == 0U) return false;
   period--;
 
-  if(pwmSetPrescaler(DS3120MG_PWM_CH, prescaler) != true) return false;
-  if(pwmSetPeriod(DS3120MG_PWM_CH, period) != true) return false;
-  if(pwmSetPulse(DS3120MG_PWM_CH, ds3120mg_tbl[ch].pulse_us) != true) return false;
+  if(pwmSetPrescaler(DS3120MG_PWM, prescaler) != true) return false;
+  if(pwmSetPeriod(DS3120MG_PWM, period) != true) return false;
+  if(pwmSetPulse(DS3120MG_PWM, ds3120mg_tbl[ch].pulse_us) != true) return false;
 
   return true;
 }

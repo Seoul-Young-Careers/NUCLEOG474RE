@@ -17,8 +17,8 @@ extern "C" {
 #ifdef _USE_DM542
 
 #define DM542_MAX_CH 		 HW_DM542_MAX
-#define DM542_PUL			_DEF_PWM2
-#define DM542_DIR			0
+#define DM542_PUL				_DEF_PWM2
+#define DM542_DIR				0
 
 
 bool dm542Init(void);                                                         // DM542 driver init

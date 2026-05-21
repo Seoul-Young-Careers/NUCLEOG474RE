@@ -17,7 +17,7 @@ extern "C" {
 #ifdef _USE_DS3120MG
 
 #define DS3120MG_MAX_CH                 HW_DS3120MG_MAX
-#define DS3120MG_PWM_CH                 _DEF_PWM3
+#define DS3120MG_PWM	                 _DEF_PWM3
 
 #define DS3120MG_DEFAULT_FREQ_HZ        50U
 #define DS3120MG_MIN_FREQ_HZ            50U

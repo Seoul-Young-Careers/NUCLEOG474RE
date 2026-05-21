@@ -73,7 +73,7 @@ static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 {
   { 79, 999, 5 },
   { 79, 999, 5 },
-  { 79, 999, 5 },
+	{ 169, 3332, 1500 },
 };
 
 #ifdef _USE_HW_CLI
@@ -113,7 +113,7 @@ bool pwmOpen(uint8_t ch)
   switch(ch)
   {
   case _DEF_PWM1 :
-	p_tim->Instance 			  = TIM2;
+  	p_tim->Instance 			  			= TIM2;
     p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
     p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
     p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -151,7 +151,7 @@ bool pwmOpen(uint8_t ch)
   pwm_tbl[ch].is_open = true;
   break;
   case _DEF_PWM2:
-		p_tim->Instance 			  = TIM3;
+		p_tim->Instance 			  				= TIM3;
 	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
 	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
 	    p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -189,7 +189,7 @@ bool pwmOpen(uint8_t ch)
 	  pwm_tbl[ch].is_open = true;
 	  break;
   case _DEF_PWM3:
-		p_tim->Instance 			  = TIM4;
+		p_tim->Instance 			  				= TIM4;
 	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
 	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
 	    p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -222,7 +222,7 @@ bool pwmOpen(uint8_t ch)
 	      return false;
 	    }
 
-	    pwmSetGpioMode(ch, od);
+	    pwmSetGpioMode(ch, pp);
 
 	  pwm_tbl[ch].is_open = true;
 	  break;
