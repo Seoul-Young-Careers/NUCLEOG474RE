@@ -7,6 +7,7 @@
 
 #include <loadcell/hx711.h>
 
+#ifdef _USE_HX711
 typedef struct
 {
   bool is_open;
@@ -213,3 +214,4 @@ static bool loadcellReadAverageRaw(uint8_t ch, uint16_t sample_count, int32_t *p
 
   return true;
 }
+#endif

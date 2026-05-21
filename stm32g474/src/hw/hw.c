@@ -19,4 +19,5 @@ void hwInit(void)
   pwmInit();
 
   dm542Init();
+  ds3120mgInit();
 }

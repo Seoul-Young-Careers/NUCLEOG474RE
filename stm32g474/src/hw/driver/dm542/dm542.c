@@ -17,10 +17,6 @@
 static void cliDm542(cli_args_t *args);
 #endif
 
-#ifndef DM542_STEP_PULSE_US
-#define DM542_STEP_PULSE_US             10U
-#endif
-
 #ifndef DM542_STEP_PER_MM
 #define DM542_STEP_PER_MM               1.0f
 #endif
@@ -84,6 +80,7 @@ bool dm542Open(uint8_t ch)
   dm542_tbl[ch].remain_step   = 0;
   dm542_tbl[ch].is_open       = true;
 
+
   return true;
 }
 
@@ -129,29 +126,6 @@ bool dm542Stop(uint8_t ch)
   dm542_tbl[ch].is_busy = false;
 
   return true;
-}
-
-bool dm542Step(uint8_t ch)
-{
-  bool ret;
-
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
-  if(dm542_tbl[ch].is_busy == true) return false;
-
-  dm542_tbl[ch].is_busy     = true;
-  dm542_tbl[ch].remain_step = 1;
-
-  ret = pwmRunUs(DM542_PUL, DM542_STEP_PULSE_US);
-  if(ret == true)
-  {
-    dm542_tbl[ch].position_step++;
-    dm542_tbl[ch].remain_step = 0;
-  }
-
-  dm542_tbl[ch].is_busy = false;
-
-  return ret;
 }
 
 bool dm542SetPrescaler(uint8_t ch, uint32_t prescaler)
@@ -324,13 +298,6 @@ static void cliDm542(cli_args_t *args)
       ret = true;
     }
 
-    if(args->isStr(0, "step") == true)
-    {
-      cmd_ret = dm542Step(ch);
-      cliPrintf("dm542 step %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
-      ret = true;
-    }
-
     if(args->isStr(0, "start") == true)
     {
       cmd_ret = dm542Start(ch);
@@ -377,15 +344,31 @@ static void cliDm542(cli_args_t *args)
     }
   }
 
+  if(args->argc == 3)
+  {
+    ch    = (uint8_t)args->getData(1);
+    step  = args->getData(2);
+
+    if(args->isStr(0, "run") == true)
+    {
+      cmd_ret = dm542MoveStep(ch, step, 1000);
+      cliPrintf("dm542 move %d %ld us : %s\n",
+                ch,
+                (long)step,
+                cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+  }
+
   if(ret != true)
   {
     cliPrintf("dm542 show\n");
     cliPrintf("dm542 open ch[0~%d]\n", DM542_MAX_CH - 1);
-    cliPrintf("dm542 step ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 start ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 stop ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 freq ch[0~%d] hz\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 move ch[0~%d] step pulse_delay_us\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 run  ch[0~%d] step\n", DM542_MAX_CH - 1);
   }
 }
 #endif

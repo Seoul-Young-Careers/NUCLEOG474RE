@@ -13,8 +13,7 @@ static void mainThread(void *argument);
 int main(void)
 {
 	bspInit();
-
-  osKernelInitialize();
+	osKernelInitialize();
 
   if (osThreadNew(mainThread, NULL, rtosGetMainThreadAttr()) == NULL)
   {

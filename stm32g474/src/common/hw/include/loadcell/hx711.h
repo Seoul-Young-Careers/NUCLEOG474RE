@@ -10,11 +10,12 @@
 
 #include "hw_def.h"
 
+#ifdef _USE_HX711
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifdef _USE_HX711
+
 #define HX711_MAX										HW_HX711_MAX
 
 #define LOADCELL_DEFAULT_SAMPLE_COUNT   10U

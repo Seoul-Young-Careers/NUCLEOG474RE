@@ -148,7 +148,7 @@ static void cliGpio(cli_args_t *args)
 		{
 			for(int i = 0; i < GPIO_MAX_CH; i++)
 			{
-				cliPrintf("%d", gpioPinRead(i));
+				cliPrintf("%d\n", gpioPinRead(i));
 			}
 			cliPrintf("\n");
 			delay(100);
@@ -164,7 +164,7 @@ static void cliGpio(cli_args_t *args)
 		ch = (uint8_t)args->getData(1);
 		while(cliKeepLoop())
 		{
-			cliPrintf("gpio read %d : %d",ch, gpioPinRead(ch));
+			cliPrintf("gpio read %d : %d\n",ch, gpioPinRead(ch));
 		}
 
 		ret = true;
@@ -180,7 +180,7 @@ static void cliGpio(cli_args_t *args)
 		value 	= (uint8_t)args->getData(2);
 
 		gpioPinWrite(ch,value);
-		cliPrintf("gpio wirte %d : %d", ch, value);
+		cliPrintf("gpio wirte %d : %d\n", ch, value);
 	}
 
 	if(ret != true)

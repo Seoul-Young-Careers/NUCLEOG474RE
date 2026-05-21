@@ -19,6 +19,7 @@
 #include "pwm.h"
 #include "dm542/dm542.h"
 #include "loadcell/hx711.h"
+#include "submotor/ds3120mg.h"
 
 void hwInit(void);
 

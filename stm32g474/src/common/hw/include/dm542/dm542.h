@@ -29,7 +29,6 @@ bool dm542IsBusy(uint8_t ch);                                                 //
 
 bool dm542Start(uint8_t ch);                                                  // Start step pulse PWM output
 bool dm542Stop(uint8_t ch);                                                   // Stop step pulse PWM output
-bool dm542Step(uint8_t ch);                                                   // Generate one step pulse
 
 bool dm542SetPrescaler(uint8_t ch, uint32_t prescaler);                       // Apply pulse PWM prescaler
 bool dm542SetPeriod(uint8_t ch, uint32_t period);                             // Apply pulse PWM period

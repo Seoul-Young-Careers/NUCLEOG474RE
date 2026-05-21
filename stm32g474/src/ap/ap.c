@@ -10,7 +10,10 @@
 
 static void threadLed(void *argument);
 static void threadMotor(void *argument);
+
+#ifdef _USE_HX711
 static void threadLoadcell(void *argument);
+#endif
 
 static osMessageQueueId_t motor_msg_q;
 
@@ -83,7 +86,7 @@ static void threadLed(void *argument)
   while (1)
   {
     ledToggle(_DEF_LED1);
-    osDelay(500);
+    delay(500);
   }
 }
 
@@ -110,6 +113,7 @@ static void threadMotor(void *argument)
   }
 }
 
+#ifdef _USE_HX711
 static void threadLoadcell(void *argument)
 {
   float gram;
@@ -136,3 +140,5 @@ static void threadLoadcell(void *argument)
     osDelay(100);
   }
 }
+#endif
+
