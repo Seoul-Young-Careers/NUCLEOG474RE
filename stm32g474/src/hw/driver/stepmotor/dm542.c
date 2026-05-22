@@ -6,7 +6,7 @@
  */
 
 
-#include "DM542/dm542.h"
+#include <stepmotor/dm542.h>
 #include "pwm.h"
 #include "gpio.h"
 #include "cli.h"

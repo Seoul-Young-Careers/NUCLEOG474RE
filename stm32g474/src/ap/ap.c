@@ -23,7 +23,9 @@ static osMessageQueueId_t motor_msg_q;
 
 void apInit(void)
 {
+#ifdef _USE_HW_CLI
   cliOpen(_DEF_UART1, 57600);
+#endif
 
   if (osThreadNew(threadLed, NULL, rtosGetLedThreadAttr()) != NULL)
   {
@@ -74,7 +76,13 @@ void apInit(void)
       delay(100);
     }
   }
+  if(sn04IsDetected(_DEF_SN04_1) != true)
+		{
+  		while(sn04IsDetected(_DEF_SN04_1) == true)
+  		{
 
+  		}
+		}
 }
 
 bool apMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
@@ -97,8 +105,11 @@ void apMain(void)
 
   while(1)
   {
+#ifdef _USE_HW_CLI
     cliMain();
+#endif
     delay(1);
+
   }
 }
 
@@ -205,6 +216,9 @@ static void cliMotor(cli_args_t *args)
     cliPrintf("motor run  ch[0~%d] step\n", DM542_MAX_CH - 1);
     cliPrintf("motor move ch[0~%d] step pulse_delay_us\n", DM542_MAX_CH - 1);
   }
+}
+static void cliRun(){
+
 }
 #endif
 

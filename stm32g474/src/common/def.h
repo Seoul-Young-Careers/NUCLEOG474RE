@@ -28,36 +28,58 @@
 #define _DEF_UART3          	2
 #define _DEF_UART4          	3
 
-#define	_DEF_SPI1				0
-#define	_DEF_SPI2				1
-#define	_DEF_SPI3				2
-#define	_DEF_SPI4				3
+#define	_DEF_SPI1							0
+#define	_DEF_SPI2							1
+#define	_DEF_SPI3							2
+#define	_DEF_SPI4							3
 
-#define _DEF_BUTTON1			0
-#define _DEF_BUTTON2			1
-#define _DEF_BUTTON3			2
-#define _DEF_BUTTON4			3
+#define _DEF_BUTTON1					0
+#define _DEF_BUTTON2					1
+#define _DEF_BUTTON3					2
+#define _DEF_BUTTON4					3
+#define _DEF_BUTTON5					4
+#define _DEF_BUTTON6					5
 
-#define _DEF_INPUT				0
-#define	_DEF_INPUT_PULLUP		1
+#define _DEF_INPUT						0
+#define	_DEF_INPUT_PULLUP			1
 #define _DEF_INPUT_PULLDOWN		2
-#define	_DEF_OUTPUT				3
+#define	_DEF_OUTPUT						3
 #define _DEF_OUTPUT_PULLUP		4
 #define	_DEF_OUTPUT_PULLDOWN	5
 #define _DEF_OUTPUT_OPENDRAIN	6
 
-#define	_DEF_LOW				0
-#define	_DEF_HIGH				1
+#define	_DEF_LOW							0
+#define	_DEF_HIGH							1
 
-#define	_DEF_I2C1				0
-#define	_DEF_I2C2				1
-#define	_DEF_I2C3				2
-#define	_DEF_I2C4				3
+#define	_DEF_I2C1							0
+#define	_DEF_I2C2							1
+#define	_DEF_I2C3							2
+#define	_DEF_I2C4							3
 
-#define _DEF_PWM1				0
-#define _DEF_PWM2				1
-#define _DEF_PWM3				2
-#define _DEF_PWM4				3
+#define _DEF_PWM1							0
+#define _DEF_PWM2							1
+#define _DEF_PWM3							2
+#define _DEF_PWM4							3
+
+#define _DEF_DS3120MG1				0
+#define _DEF_DS3120MG2				1
+#define _DEF_DS3120MG3				2
+#define _DEF_DS3120MG4				3
+
+#define _DEF_2V025_1					0
+#define _DEF_2V025_2					1
+#define _DEF_2V025_3					2
+#define _DEF_2V025_4					3
+
+#define _DEF_DM542_1					0
+#define _DEF_DM542_2					1
+#define _DEF_DM542_3					2
+#define _DEF_DM542_4					3
+
+#define _DEF_SN04_1						0
+#define _DEF_SN04_2						1
+#define _DEF_SN04_3						2
+#define _DEF_SN04_4						3
 
 #define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 

@@ -5,8 +5,8 @@
  *      Author: young
  */
 
-#ifndef SRC_COMMON_HW_INCLUDE_DM542_DM542_H_
-#define SRC_COMMON_HW_INCLUDE_DM542_DM542_H_
+#ifndef SRC_COMMON_HW_INCLUDE_STEPMOTOR_DM542_H_
+#define SRC_COMMON_HW_INCLUDE_STEPMOTOR_DM542_H_
 
 #include "hw_def.h"
 
@@ -44,4 +44,4 @@ bool dm542MoveMm(uint8_t ch, float mm, uint32_t pulse_delay_us);               /
 }
 #endif
 
-#endif /* SRC_COMMON_HW_INCLUDE_DM542_DM542_H_ */
+#endif /* SRC_COMMON_HW_INCLUDE_STEPMOTOR_DM542_H_ */

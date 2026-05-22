@@ -20,4 +20,6 @@ void hwInit(void)
 
   dm542Init();
   ds3120mgInit();
+  sn04Init();
+  v025Init();
 }

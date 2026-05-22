@@ -71,9 +71,9 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
 
 static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 {
-  { 79, 999, 5 },
-  { 79, 999, 5 },
-	{ 169, 3332, 1500 },
+	{ 169, 3332, 1500 },									// sub motor
+  { 79, 999, 5 },												// step motor
+	{ 169, 3332, 1500 },									// sub motor
 };
 
 #ifdef _USE_HW_CLI

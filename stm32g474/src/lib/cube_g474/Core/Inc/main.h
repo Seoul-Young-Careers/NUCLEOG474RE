@@ -57,12 +57,32 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define DS3120MG_1_Pin GPIO_PIN_0
+#define DS3120MG_1_GPIO_Port GPIOA
 #define LED_Pin GPIO_PIN_5
 #define LED_GPIO_Port GPIOA
 #define DM542_PUL_Pin GPIO_PIN_6
 #define DM542_PUL_GPIO_Port GPIOA
 #define DM542_DIR_Pin GPIO_PIN_7
 #define DM542_DIR_GPIO_Port GPIOA
+#define BUTTON_STOP_Pin GPIO_PIN_4
+#define BUTTON_STOP_GPIO_Port GPIOC
+#define BUTTON_RESET_Pin GPIO_PIN_5
+#define BUTTON_RESET_GPIO_Port GPIOC
+#define SN04_2_Pin GPIO_PIN_10
+#define SN04_2_GPIO_Port GPIOB
+#define VALVE_2_Pin GPIO_PIN_7
+#define VALVE_2_GPIO_Port GPIOC
+#define SN04_1_Pin GPIO_PIN_8
+#define SN04_1_GPIO_Port GPIOA
+#define VALVE_1_Pin GPIO_PIN_9
+#define VALVE_1_GPIO_Port GPIOA
+#define BUTTON_START_Pin GPIO_PIN_10
+#define BUTTON_START_GPIO_Port GPIOA
+#define BUTTON_FOOT_Pin GPIO_PIN_3
+#define BUTTON_FOOT_GPIO_Port GPIOB
+#define DS3120MG_2_Pin GPIO_PIN_6
+#define DS3120MG_2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

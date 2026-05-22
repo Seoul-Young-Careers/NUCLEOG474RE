@@ -9,6 +9,8 @@
 #define SRC_HW_HW_H_
 
 
+#include <servomotor/ds3120mg.h>
+#include <stepmotor/dm542.h>
 #include "hw_def.h"
 
 #include "led.h"
@@ -17,9 +19,9 @@
 #include "button.h"
 #include "gpio.h"
 #include "pwm.h"
-#include "dm542/dm542.h"
 #include "loadcell/hx711.h"
-#include "submotor/ds3120mg.h"
+#include "sensor/sn04.h"
+#include "valve/2v025.h"
 
 void hwInit(void);
 

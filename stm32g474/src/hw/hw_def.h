@@ -25,7 +25,7 @@
 #define      HW_CLI_LINE_BUF_MAX    64
 
 #define	_USE_HW_BUTTON
-#define		 HW_BUTTON_MAX_CH					3
+#define		 HW_BUTTON_MAX_CH					4
 
 #define	_USE_HW_GPIO
 #define		 HW_GPIO_MAX_CH						1
@@ -53,7 +53,7 @@
 #define		HW_DS3120MG_MAX						2
 
 #define _USE_SN04
-#define		HW_SN04_MAX_CH						1
+#define		HW_SN04_MAX_CH						2
 
 #define _USE_2V025
 #define		HW_2V025_MAX_CH						1
