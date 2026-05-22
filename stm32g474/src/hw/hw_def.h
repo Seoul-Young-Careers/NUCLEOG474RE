@@ -25,18 +25,18 @@
 #define      HW_CLI_LINE_BUF_MAX    64
 
 #define	_USE_HW_BUTTON
-#define		 HW_BUTTON_MAX_CH					1
+#define		 HW_BUTTON_MAX_CH					3
 
 #define	_USE_HW_GPIO
 #define		 HW_GPIO_MAX_CH						1
 
-#define	_USE_HW_SPI
-#define 	HW_SPI_MAX_CH							1
+//#define	_USE_HW_SPI
+//#define 	HW_SPI_MAX_CH							1
 
 //#define _USE_HW_LCD
 //#define _USE_HW_ST7735
-#define		HW_LCD_WIDTH							160
-#define 	HW_LCD_HEIGHT     				160
+//#define		HW_LCD_WIDTH							160
+//#define 	HW_LCD_HEIGHT     				160
 
 #define _USE_PWM
 #define 	HW_PWM_MAX_CH							3
@@ -50,7 +50,13 @@
 */
 
 #define _USE_DS3120MG
-#define		HW_DS3120MG_MAX						1
+#define		HW_DS3120MG_MAX						2
+
+#define _USE_SN04
+#define		HW_SN04_MAX_CH						1
+
+#define _USE_2V025
+#define		HW_2V025_MAX_CH						1
 
 
 #endif /* SRC_HW_HW_DEF_H_ */
