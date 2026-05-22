@@ -5,8 +5,8 @@
  *      Author: young
  */
 
-#ifndef SRC_COMMON_HW_INCLUDE_SUBMOTOR_DS3120MG_H_
-#define SRC_COMMON_HW_INCLUDE_SUBMOTOR_DS3120MG_H_
+#ifndef SRC_COMMON_HW_INCLUDE_SERVOMOTOR_DS3120MG_H_
+#define SRC_COMMON_HW_INCLUDE_SERVOMOTOR_DS3120MG_H_
 
 #include "hw_def.h"
 
@@ -61,4 +61,4 @@ bool ds3120mgReadData(uint8_t ch, ds3120mg_data_t *p_data);                  // 
 }
 #endif
 
-#endif /* SRC_COMMON_HW_INCLUDE_SUBMOTOR_DS3120MG_H_ */
+#endif /* SRC_COMMON_HW_INCLUDE_SERVOMOTOR_DS3120MG_H_ */

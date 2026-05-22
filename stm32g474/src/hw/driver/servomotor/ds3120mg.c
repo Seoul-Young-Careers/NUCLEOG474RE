@@ -5,7 +5,7 @@
  *      Author: young
  */
 
-#include "submotor/ds3120mg.h"
+#include <servomotor/ds3120mg.h>
 #include "pwm.h"
 
 #ifdef _USE_DS3120MG
