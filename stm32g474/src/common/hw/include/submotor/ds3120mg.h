@@ -17,11 +17,8 @@ extern "C" {
 #ifdef _USE_DS3120MG
 
 #define DS3120MG_MAX_CH                 HW_DS3120MG_MAX
-#define DS3120MG_PWM	                 _DEF_PWM3
 
-#define DS3120MG_DEFAULT_FREQ_HZ        50U
-#define DS3120MG_MIN_FREQ_HZ            50U
-#define DS3120MG_MAX_FREQ_HZ            330U
+#define DS3120MG_DEFAULT_FREQ_HZ        300U
 
 #define DS3120MG_MIN_PULSE_US           500U
 #define DS3120MG_MID_PULSE_US           1500U
@@ -49,7 +46,6 @@ bool ds3120mgIsStarted(uint8_t ch);                                          // 
 bool ds3120mgStart(uint8_t ch);                                              // Start servo PWM output
 bool ds3120mgStop(uint8_t ch);                                               // Stop servo PWM output
 
-bool ds3120mgSetFreq(uint8_t ch, uint16_t freq_hz);                          // Set servo PWM frequency
 bool ds3120mgSetPulseUs(uint8_t ch, uint16_t pulse_us);                      // Set servo pulse width
 bool ds3120mgSetAngle(uint8_t ch, float angle_deg);                          // Set servo angle
 bool ds3120mgCenter(uint8_t ch);                                             // Move servo to neutral position
@@ -57,11 +53,6 @@ bool ds3120mgCenter(uint8_t ch);                                             // 
 uint16_t ds3120mgGetPulseUs(uint8_t ch);                                     // Get current pulse width
 float ds3120mgGetAngle(uint8_t ch);                                          // Get current angle
 
-bool ds3120mgSetRange(uint8_t ch,
-                      uint16_t min_pulse_us,
-                      uint16_t mid_pulse_us,
-                      uint16_t max_pulse_us,
-                      float max_angle_deg);                                  // Set calibration range
 bool ds3120mgReadData(uint8_t ch, ds3120mg_data_t *p_data);                  // Read current servo settings
 
 #endif
