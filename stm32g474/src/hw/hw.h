@@ -11,6 +11,7 @@
 
 #include <servomotor/ds3120mg.h>
 #include <stepmotor/dm542.h>
+#include <motordriver/bts7960.h>
 #include "hw_def.h"
 
 #include "led.h"

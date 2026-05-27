@@ -584,15 +584,16 @@ bool pwmSetGpioMode(uint8_t ch, uint32_t mode)
     	GPIO_InitStruct.Alternate = GPIO_AF2_TIM5;
     	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
     	break;
+
+    case _DEF_PWM5:
     	GPIO_InitStruct.Pin 			= GPIO_PIN_14;
     	GPIO_InitStruct.Mode 			= mode;
     	GPIO_InitStruct.Pull 			= GPIO_NOPULL;
     	GPIO_InitStruct.Speed 		= GPIO_SPEED_FREQ_LOW;
     	GPIO_InitStruct.Alternate = GPIO_AF1_TIM15;
     	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    case _DEF_PWM5:
-
     	break;
+
     default:
       return false;
   }

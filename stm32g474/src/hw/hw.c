@@ -19,6 +19,9 @@ void hwInit(void)
   pwmInit();
 
   dm542Init();
+#ifdef _USE_BTS7960
+  bts7960Init();
+#endif
   ds3120mgInit();
   sn04Init();
   v025Init();

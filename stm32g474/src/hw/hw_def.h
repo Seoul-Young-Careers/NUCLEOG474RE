@@ -44,10 +44,8 @@
 #define _USE_DM542
 #define		HW_DM542_MAX							1
 
-/*
 #define _USE_BTS7960
 #define		HW_BTS7960_MAX_CH					1
-*/
 
 /*
 #define _USE_HX711
