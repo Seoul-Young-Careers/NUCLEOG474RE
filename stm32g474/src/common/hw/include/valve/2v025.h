@@ -17,6 +17,7 @@ extern "C" {
 #ifdef _USE_2V025
 
 #define V025_MAX_CH                    HW_2V025_MAX_CH
+#define V025_LOCK_TIMEOUT_MS           100U
 
 typedef struct
 {

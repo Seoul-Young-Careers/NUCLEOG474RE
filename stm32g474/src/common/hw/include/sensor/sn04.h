@@ -17,6 +17,7 @@ extern "C" {
 #ifdef _USE_SN04
 
 #define SN04_MAX_CH                    HW_SN04_MAX_CH
+#define SN04_LOCK_TIMEOUT_MS           100U
 
 typedef struct
 {

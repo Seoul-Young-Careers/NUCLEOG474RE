@@ -40,10 +40,33 @@ static const sn04_pin_t sn04_pin_tbl[SN04_MAX_CH] =
 
 static sn04_tbl_t sn04_tbl[SN04_MAX_CH];
 
+static bool sn04Lock(void);
+static void sn04Unlock(void);
+
+#ifdef _USE_HW_RTOS
+static osMutexId_t sn04_mutex = NULL;
+static const osMutexAttr_t sn04_mutex_attr =
+{
+  .name      = "sn04",
+  .attr_bits = osMutexRecursive | osMutexPrioInherit,
+};
+#endif
+
 bool sn04Init(void)
 {
   bool ret = true;
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+#ifdef _USE_HW_RTOS
+  if(sn04_mutex == NULL)
+  {
+    sn04_mutex = osMutexNew(&sn04_mutex_attr);
+    if(sn04_mutex == NULL)
+    {
+      ret = false;
+    }
+  }
+#endif
 
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -69,24 +92,40 @@ bool sn04Init(void)
 
 bool sn04IsReady(uint8_t ch)
 {
-  if(ch >= SN04_MAX_CH) return false;
+  bool ret = false;
 
-  return sn04_tbl[ch].is_ready;
+  if(sn04Lock() != true) return false;
+
+  if(ch < SN04_MAX_CH)
+  {
+    ret = sn04_tbl[ch].is_ready;
+  }
+
+  sn04Unlock();
+
+  return ret;
 }
 
 bool sn04Read(uint8_t ch)
 {
   bool ret = false;
 
-  if(ch >= SN04_MAX_CH) return false;
-  if(sn04_tbl[ch].is_ready != true) return false;
+  if(sn04Lock() != true) return false;
 
-  if(HAL_GPIO_ReadPin(sn04_pin_tbl[ch].port, sn04_pin_tbl[ch].pin) == sn04_pin_tbl[ch].on_state)
+  do
   {
-    ret = true;
-  }
+    if(ch >= SN04_MAX_CH) break;
+    if(sn04_tbl[ch].is_ready != true) break;
 
-  sn04_tbl[ch].is_detected = ret;
+    if(HAL_GPIO_ReadPin(sn04_pin_tbl[ch].port, sn04_pin_tbl[ch].pin) == sn04_pin_tbl[ch].on_state)
+    {
+      ret = true;
+    }
+
+    sn04_tbl[ch].is_detected = ret;
+  } while(0);
+
+  sn04Unlock();
 
   return ret;
 }
@@ -98,13 +137,48 @@ bool sn04IsDetected(uint8_t ch)
 
 bool sn04ReadData(uint8_t ch, sn04_data_t *p_data)
 {
-  if(ch >= SN04_MAX_CH) return false;
-  if(p_data == NULL) return false;
+  bool ret = false;
 
-  p_data->is_ready    = sn04_tbl[ch].is_ready;
-  p_data->is_detected = sn04Read(ch);
+  if(sn04Lock() != true) return false;
+
+  do
+  {
+    if(ch >= SN04_MAX_CH) break;
+    if(p_data == NULL) break;
+
+    p_data->is_ready    = sn04_tbl[ch].is_ready;
+    p_data->is_detected = sn04Read(ch);
+
+    ret = true;
+  } while(0);
+
+  sn04Unlock();
+
+  return ret;
+}
+
+static bool sn04Lock(void)
+{
+#ifdef _USE_HW_RTOS
+  if(__get_IPSR() != 0U) return false;
+
+  if((sn04_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    return osMutexAcquire(sn04_mutex, SN04_LOCK_TIMEOUT_MS) == osOK;
+  }
+#endif
 
   return true;
+}
+
+static void sn04Unlock(void)
+{
+#ifdef _USE_HW_RTOS
+  if((sn04_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    (void)osMutexRelease(sn04_mutex);
+  }
+#endif
 }
 
 #ifdef _USE_HW_CLI

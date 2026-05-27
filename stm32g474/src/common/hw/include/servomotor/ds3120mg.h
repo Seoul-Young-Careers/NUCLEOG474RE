@@ -18,16 +18,19 @@ extern "C" {
 
 #define DS3120MG_MAX_CH                 HW_DS3120MG_MAX
 
-#define DS3120MG_DEFAULT_FREQ_HZ        300U
+#define DS3120MG_FREQ_HZ                300U
 
 #define DS3120MG_MIN_PULSE_US           500U
 #define DS3120MG_MID_PULSE_US           1500U
 #define DS3120MG_MAX_PULSE_US           2500U
-#define DS3120MG_DEFAULT_ANGLE_DEG      90.0f
+#define DS3120MG_ANGLE_DEG              90.0f
 #define DS3120MG_MAX_ANGLE_DEG          180.0f
+#define DS3120MG_LOCK_TIMEOUT_MS        100U
 
 typedef struct
 {
+  bool is_open;
+  bool is_started;
   uint16_t freq_hz;
   uint16_t min_pulse_us;
   uint16_t mid_pulse_us;
@@ -49,6 +52,7 @@ bool ds3120mgStop(uint8_t ch);                                               // 
 bool ds3120mgSetPulseUs(uint8_t ch, uint16_t pulse_us);                      // Set servo pulse width
 bool ds3120mgSetAngle(uint8_t ch, float angle_deg);                          // Set servo angle
 bool ds3120mgCenter(uint8_t ch);                                             // Move servo to neutral position
+bool ds3120mgRun(uint8_t ch, float angle_deg);                               // Set angle and start PWM output
 
 uint16_t ds3120mgGetPulseUs(uint8_t ch);                                     // Get current pulse width
 float ds3120mgGetAngle(uint8_t ch);                                          // Get current angle

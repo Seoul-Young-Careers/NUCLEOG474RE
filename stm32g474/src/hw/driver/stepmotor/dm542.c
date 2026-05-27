@@ -41,9 +41,33 @@ static dm542_tbl_t dm542_tbl[DM542_MAX_CH] =
   },
 };
 
+#ifdef _USE_HW_RTOS
+static osMutexId_t dm542_mutex = NULL;
+static const osMutexAttr_t dm542_mutex_attr =
+{
+  .name      = "dm542",
+  .attr_bits = osMutexRecursive | osMutexPrioInherit,
+};
+#endif
+
+static bool dm542Lock(void);
+static void dm542Unlock(void);
+static void dm542EndMove(uint8_t ch);
+
 bool dm542Init(void)
 {
   bool ret = true;
+
+#ifdef _USE_HW_RTOS
+  if(dm542_mutex == NULL)
+  {
+    dm542_mutex = osMutexNew(&dm542_mutex_attr);
+    if(dm542_mutex == NULL)
+    {
+      ret = false;
+    }
+  }
+#endif
 
   for(uint8_t i = 0; i < DM542_MAX_CH; i++)
   {
@@ -67,138 +91,223 @@ bool dm542Init(void)
 
 bool dm542Open(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH) 					return false;
-  if(dm542_tbl[ch].is_open == true)			return true;
+  bool ret = false;
 
-  if(pwmOpen(DM542_PUL) != true)
+  if(dm542Lock() != true) return false;
+
+  do
   {
-    return false;
-  }
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open == true)
+    {
+      ret = true;
+      break;
+    }
 
-  dm542_tbl[ch].is_busy       = false;
-  dm542_tbl[ch].position_step = 0;
-  dm542_tbl[ch].remain_step   = 0;
-  dm542_tbl[ch].is_open       = true;
+    if(pwmOpen(DM542_PUL) != true) break;
 
+    dm542_tbl[ch].is_busy       = false;
+    dm542_tbl[ch].position_step = 0;
+    dm542_tbl[ch].remain_step   = 0;
+    dm542_tbl[ch].is_open       = true;
 
-  return true;
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542IsOpen(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH)  return false;
+  bool ret = false;
 
-  return dm542_tbl[ch].is_open;
+  if(dm542Lock() != true) return false;
+
+  if(ch < DM542_MAX_CH)
+  {
+    ret = dm542_tbl[ch].is_open;
+  }
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542IsBusy(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH)  return false;
+  bool ret = false;
 
-  return dm542_tbl[ch].is_busy;
+  if(dm542Lock() != true) return false;
+
+  if(ch < DM542_MAX_CH)
+  {
+    ret = dm542_tbl[ch].is_busy;
+  }
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542Start(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
+  bool ret = false;
 
-  if(pwmStart(DM542_PUL) != true)
+  if(dm542Lock() != true) return false;
+
+  do
   {
-    return false;
-  }
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
 
-  dm542_tbl[ch].is_busy = true;
+    if(pwmStart(DM542_PUL) != true) break;
 
-  return true;
+    dm542_tbl[ch].is_busy = true;
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542Stop(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
+  bool ret = false;
 
-  if(pwmStop(DM542_PUL) != true)
+  if(dm542Lock() != true) return false;
+
+  do
   {
-    return false;
-  }
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
 
-  dm542_tbl[ch].is_busy = false;
+    if(pwmStop(DM542_PUL) != true) break;
 
-  return true;
+    dm542_tbl[ch].remain_step = 0U;
+    dm542_tbl[ch].is_busy     = false;
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542SetPrescaler(uint8_t ch, uint32_t prescaler)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
+  bool ret = false;
 
-  return pwmSetPrescaler(DM542_PUL, prescaler);
+  if(dm542Lock() != true) return false;
+
+  do
+  {
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+
+    ret = pwmSetPrescaler(DM542_PUL, prescaler);
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542SetPeriod(uint8_t ch, uint32_t period)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
+  bool ret = false;
 
-  return pwmSetPeriod(DM542_PUL, period);
+  if(dm542Lock() != true) return false;
+
+  do
+  {
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+
+    ret = pwmSetPeriod(DM542_PUL, period);
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542SetPulse(uint8_t ch, uint32_t pulse)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
+  bool ret = false;
 
-  return pwmSetPulse(DM542_PUL, pulse);
+  if(dm542Lock() != true) return false;
+
+  do
+  {
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+
+    ret = pwmSetPulse(DM542_PUL, pulse);
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542SetFreq(uint8_t ch, uint32_t freq_hz)
 {
+  bool ret = false;
   uint32_t timer_clk;
   uint32_t prescaler;
   uint32_t period;
   uint32_t pulse;
 
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
-  if(freq_hz == 0U) return false;
+  if(dm542Lock() != true) return false;
 
-  timer_clk = HAL_RCC_GetHCLKFreq();
-  prescaler = timer_clk / 1000000U;
-  if(prescaler == 0U) return false;
-  prescaler--;
-
-  period = 1000000U / freq_hz;
-  if(period == 0U) return false;
-  period--;
-
-  pulse = (period + 1U) / 2U;
-  if(pulse > 0U)
+  do
   {
-    pulse--;
-  }
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+    if(freq_hz == 0U) break;
 
-  if(dm542SetPrescaler(ch, prescaler) != true) return false;
-  if(dm542SetPeriod(ch, period) != true) return false;
-  if(dm542SetPulse(ch, pulse) != true) return false;
+    timer_clk = HAL_RCC_GetHCLKFreq();
+    prescaler = timer_clk / 1000000U;
+    if(prescaler == 0U) break;
+    prescaler--;
 
-  return true;
+    period = 1000000U / freq_hz;
+    if(period == 0U) break;
+    period--;
+
+    pulse = (period + 1U) / 2U;
+    if(pulse > 0U)
+    {
+      pulse--;
+    }
+
+    if(dm542SetPrescaler(ch, prescaler) != true) break;
+    if(dm542SetPeriod(ch, period) != true) break;
+    if(dm542SetPulse(ch, pulse) != true) break;
+
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
 }
 
 bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
 {
+  bool ret = false;
   bool dir;
   uint32_t step_count;
 
-  if(ch >= DM542_MAX_CH) return false;
-  if(dm542_tbl[ch].is_open != true) return false;
-  if(dm542_tbl[ch].is_busy == true) return false;
   if(pulse_delay_us == 0U) return false;
-
-  if(step == 0)
-  {
-    return true;
-  }
 
   dir = step > 0;
   if(step > 0)
@@ -210,17 +319,68 @@ bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
     step_count = (uint32_t)(-(step + 1)) + 1U;
   }
 
-  gpioPinWrite(DM542_DIR, dir);
+  if(dm542Lock() != true) return false;
 
-  dm542_tbl[ch].is_busy     = true;
-  dm542_tbl[ch].remain_step = step_count;
-
-  while(dm542_tbl[ch].remain_step > 0U)
+  do
   {
-    if(pwmRunUs(DM542_PUL, pulse_delay_us) != true)
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+
+    if(step == 0)
+    {
+      ret = true;
+      break;
+    }
+
+    gpioPinWrite(DM542_DIR, dir);
+
+    dm542_tbl[ch].is_busy     = true;
+    dm542_tbl[ch].remain_step = step_count;
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  if(ret != true)
+  {
+    return false;
+  }
+
+  while(true)
+  {
+    if(dm542Lock() != true)
+    {
+      dm542EndMove(ch);
+      return false;
+    }
+
+    if(dm542_tbl[ch].remain_step == 0U)
     {
       dm542_tbl[ch].is_busy = false;
+      dm542Unlock();
+      break;
+    }
+
+    dm542Unlock();
+
+    if(pwmRunUs(DM542_PUL, pulse_delay_us) != true)
+    {
+      dm542EndMove(ch);
       return false;
+    }
+
+    if(dm542Lock() != true)
+    {
+      dm542EndMove(ch);
+      return false;
+    }
+
+    if(dm542_tbl[ch].remain_step == 0U)
+    {
+      dm542_tbl[ch].is_busy = false;
+      dm542Unlock();
+      break;
     }
 
     if(dir == true)
@@ -233,9 +393,14 @@ bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
     }
 
     dm542_tbl[ch].remain_step--;
-  }
 
-  dm542_tbl[ch].is_busy = false;
+    if(dm542_tbl[ch].remain_step == 0U)
+    {
+      dm542_tbl[ch].is_busy = false;
+    }
+
+    dm542Unlock();
+  }
 
   return true;
 }
@@ -260,6 +425,67 @@ bool dm542MoveMm(uint8_t ch, float mm, uint32_t pulse_delay_us)
   return dm542MoveStep(ch, step, pulse_delay_us);
 }
 
+bool dm542ReadData(uint8_t ch, dm542_data_t *p_data)
+{
+  bool ret = false;
+
+  if(dm542Lock() != true) return false;
+
+  do
+  {
+    if(ch >= DM542_MAX_CH) break;
+    if(p_data == NULL) break;
+
+    p_data->is_open       = dm542_tbl[ch].is_open;
+    p_data->is_busy       = dm542_tbl[ch].is_busy;
+    p_data->position_step = dm542_tbl[ch].position_step;
+    p_data->remain_step   = dm542_tbl[ch].remain_step;
+
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
+}
+
+static bool dm542Lock(void)
+{
+#ifdef _USE_HW_RTOS
+  if(__get_IPSR() != 0U) return false;
+
+  if((dm542_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    return osMutexAcquire(dm542_mutex, DM542_LOCK_TIMEOUT_MS) == osOK;
+  }
+#endif
+
+  return true;
+}
+
+static void dm542Unlock(void)
+{
+#ifdef _USE_HW_RTOS
+  if((dm542_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    (void)osMutexRelease(dm542_mutex);
+  }
+#endif
+}
+
+static void dm542EndMove(uint8_t ch)
+{
+  if(dm542Lock() != true) return;
+
+  if(ch < DM542_MAX_CH)
+  {
+    dm542_tbl[ch].remain_step = 0U;
+    dm542_tbl[ch].is_busy     = false;
+  }
+
+  dm542Unlock();
+}
+
 #ifdef _USE_HW_CLI
 static void cliDm542(cli_args_t *args)
 {
@@ -274,12 +500,17 @@ static void cliDm542(cli_args_t *args)
     {
       for(uint8_t i = 0; i < DM542_MAX_CH; i++)
       {
-        cliPrintf("dm542 %d open:%d busy:%d pos:%ld remain:%lu\n",
-                  i,
-                  dm542_tbl[i].is_open,
-                  dm542_tbl[i].is_busy,
-                  (long)dm542_tbl[i].position_step,
-                  dm542_tbl[i].remain_step);
+        dm542_data_t data;
+
+        if(dm542ReadData(i, &data) == true)
+        {
+          cliPrintf("dm542 %d open:%d busy:%d pos:%ld remain:%lu\n",
+                    i,
+                    data.is_open,
+                    data.is_busy,
+                    (long)data.position_step,
+                    data.remain_step);
+        }
       }
 
       ret = true;

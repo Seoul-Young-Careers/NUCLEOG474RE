@@ -36,11 +36,24 @@ typedef struct
 static const v025_pin_t v025_pin_tbl[V025_MAX_CH] =
 {
   {GPIOA, GPIO_PIN_9, GPIO_PIN_SET, GPIO_PIN_RESET},
-	{GPIOC, GPIO_PIN_7, GPIO_PIN_SET, GPIO_PIN_RESET},
+#if V025_MAX_CH > 1
+  {GPIOC, GPIO_PIN_7, GPIO_PIN_SET, GPIO_PIN_RESET},
+#endif
 };
 
 static v025_tbl_t v025_tbl[V025_MAX_CH];
 
+#ifdef _USE_HW_RTOS
+static osMutexId_t v025_mutex = NULL;
+static const osMutexAttr_t v025_mutex_attr =
+{
+  .name      = "v025",
+  .attr_bits = osMutexRecursive | osMutexPrioInherit,
+};
+#endif
+
+static bool v025Lock(void);
+static void v025Unlock(void);
 static void v025WritePin(uint8_t ch, bool open)
 {
   if(open == true)
@@ -62,8 +75,20 @@ bool v025Init(void)
   bool ret = true;
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
+#ifdef _USE_HW_RTOS
+  if(v025_mutex == NULL)
+  {
+    v025_mutex = osMutexNew(&v025_mutex_attr);
+    if(v025_mutex == NULL)
+    {
+      ret = false;
+    }
+  }
+#endif
+
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull  = GPIO_NOPULL;
@@ -89,9 +114,18 @@ bool v025Init(void)
 
 bool v025IsReady(uint8_t ch)
 {
-  if(ch >= V025_MAX_CH) return false;
+  bool ret = false;
 
-  return v025_tbl[ch].is_ready;
+  if(v025Lock() != true) return false;
+
+  if(ch < V025_MAX_CH)
+  {
+    ret = v025_tbl[ch].is_ready;
+  }
+
+  v025Unlock();
+
+  return ret;
 }
 
 bool v025ValveOpen(uint8_t ch)
@@ -106,40 +140,104 @@ bool v025ValveClose(uint8_t ch)
 
 bool v025ValveSet(uint8_t ch, bool open)
 {
-  if(ch >= V025_MAX_CH) return false;
-  if(v025_tbl[ch].is_ready != true) return false;
+  bool ret = false;
 
-  v025WritePin(ch, open);
-  v025_tbl[ch].is_open = open;
+  if(v025Lock() != true) return false;
 
-  return true;
+  do
+  {
+    if(ch >= V025_MAX_CH) break;
+    if(v025_tbl[ch].is_ready != true) break;
+
+    v025WritePin(ch, open);
+    v025_tbl[ch].is_open = open;
+    ret = true;
+  } while(0);
+
+  v025Unlock();
+
+  return ret;
 }
 
 bool v025ValveToggle(uint8_t ch)
 {
-  if(ch >= V025_MAX_CH) return false;
-  if(v025_tbl[ch].is_ready != true) return false;
+  bool ret = false;
 
-  return v025ValveSet(ch, !v025_tbl[ch].is_open);
+  if(v025Lock() != true) return false;
+
+  do
+  {
+    if(ch >= V025_MAX_CH) break;
+    if(v025_tbl[ch].is_ready != true) break;
+
+    ret = v025ValveSet(ch, !v025_tbl[ch].is_open);
+  } while(0);
+
+  v025Unlock();
+
+  return ret;
 }
 
 bool v025ValveIsOpen(uint8_t ch)
 {
-  if(ch >= V025_MAX_CH) return false;
-  if(v025_tbl[ch].is_ready != true) return false;
+  bool ret = false;
 
-  return v025_tbl[ch].is_open;
+  if(v025Lock() != true) return false;
+
+  if((ch < V025_MAX_CH) && (v025_tbl[ch].is_ready == true))
+  {
+    ret = v025_tbl[ch].is_open;
+  }
+
+  v025Unlock();
+
+  return ret;
 }
 
 bool v025ReadData(uint8_t ch, v025_data_t *p_data)
 {
-  if(ch >= V025_MAX_CH) return false;
-  if(p_data == NULL) return false;
+  bool ret = false;
 
-  p_data->is_ready = v025_tbl[ch].is_ready;
-  p_data->is_open  = v025_tbl[ch].is_open;
+  if(v025Lock() != true) return false;
+
+  do
+  {
+    if(ch >= V025_MAX_CH) break;
+    if(p_data == NULL) break;
+
+    p_data->is_ready = v025_tbl[ch].is_ready;
+    p_data->is_open  = v025_tbl[ch].is_open;
+
+    ret = true;
+  } while(0);
+
+  v025Unlock();
+
+  return ret;
+}
+
+static bool v025Lock(void)
+{
+#ifdef _USE_HW_RTOS
+  if(__get_IPSR() != 0U) return false;
+
+  if((v025_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    return osMutexAcquire(v025_mutex, V025_LOCK_TIMEOUT_MS) == osOK;
+  }
+#endif
 
   return true;
+}
+
+static void v025Unlock(void)
+{
+#ifdef _USE_HW_RTOS
+  if((v025_mutex != NULL) && (osKernelGetState() == osKernelRunning))
+  {
+    (void)osMutexRelease(v025_mutex);
+  }
+#endif
 }
 
 #ifdef _USE_HW_CLI
