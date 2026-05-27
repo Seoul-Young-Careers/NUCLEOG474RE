@@ -39,10 +39,15 @@
 //#define 	HW_LCD_HEIGHT     				160
 
 #define _USE_PWM
-#define 	HW_PWM_MAX_CH							3
+#define 	HW_PWM_MAX_CH							5
 
 #define _USE_DM542
 #define		HW_DM542_MAX							1
+
+/*
+#define _USE_BTS7960
+#define		HW_BTS7960_MAX_CH					1
+*/
 
 /*
 #define _USE_HX711

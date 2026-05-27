@@ -16,6 +16,8 @@
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim15;
 
 #define od 			GPIO_MODE_AF_OD
 #define pp			GPIO_MODE_AF_PP
@@ -67,6 +69,24 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
     .is_count_mode  = false,
     .remain_count   = 0,
   },
+  {
+    .p_tim          = &htim5,
+    .channel        = TIM_CHANNEL_1,
+
+    .is_open        = false,
+    .is_busy        = false,
+    .is_count_mode  = false,
+    .remain_count   = 0,
+  },
+  {
+    .p_tim          = &htim15,
+    .channel        = TIM_CHANNEL_1,
+
+    .is_open        = false,
+    .is_busy        = false,
+    .is_count_mode  = false,
+    .remain_count   = 0,
+  },
 };
 
 static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
@@ -74,6 +94,8 @@ static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 	{ 169, 3332, 1500 },									// sub motor
   { 79, 999, 5 },												// step motor
 	{ 169, 3332, 1500 },									// sub motor
+	{ 79, 999, 5 },												// motor driver
+	{ 79, 999, 5 },												// motor driver
 };
 
 #ifdef _USE_HW_CLI
@@ -151,7 +173,7 @@ bool pwmOpen(uint8_t ch)
   pwm_tbl[ch].is_open = true;
   break;
   case _DEF_PWM2:
-		p_tim->Instance 			  				= TIM3;
+			p_tim->Instance 			  				= TIM3;
 	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
 	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
 	    p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -189,7 +211,7 @@ bool pwmOpen(uint8_t ch)
 	  pwm_tbl[ch].is_open = true;
 	  break;
   case _DEF_PWM3:
-		p_tim->Instance 			  				= TIM4;
+			p_tim->Instance 			  				= TIM4;
 	    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
 	    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
 	    p_tim->Init.Period            = pwm_cfg[ch].period;
@@ -226,6 +248,82 @@ bool pwmOpen(uint8_t ch)
 
 	  pwm_tbl[ch].is_open = true;
 	  break;
+  case _DEF_PWM4:
+		p_tim->Instance 			  			= TIM5;
+    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
+    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
+    p_tim->Init.Period            = pwm_cfg[ch].period;
+    p_tim->Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+    p_tim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+    if(HAL_TIM_PWM_Init(p_tim) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+    if(HAL_TIMEx_MasterConfigSynchronization(p_tim, &sMasterConfig) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    sConfigOC.OCMode     = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse      = pwm_cfg[ch].pulse;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].channel) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    pwmSetGpioMode(ch, pp);
+
+  pwm_tbl[ch].is_open = true;
+  	break;
+  case _DEF_PWM5:
+		p_tim->Instance 			  			= TIM15;
+    p_tim->Init.Prescaler         = pwm_cfg[ch].prescaler;
+    p_tim->Init.CounterMode       = TIM_COUNTERMODE_UP;
+    p_tim->Init.Period            = pwm_cfg[ch].period;
+    p_tim->Init.ClockDivision     = TIM_CLOCKDIVISION_DIV1;
+    p_tim->Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+    if(HAL_TIM_PWM_Init(p_tim) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+    if(HAL_TIMEx_MasterConfigSynchronization(p_tim, &sMasterConfig) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    sConfigOC.OCMode     = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse      = pwm_cfg[ch].pulse;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+    if(HAL_TIM_PWM_ConfigChannel(p_tim, &sConfigOC, pwm_tbl[ch].channel) != HAL_OK)
+    {
+      p_tim->Instance = NULL;
+      return false;
+    }
+
+    pwmSetGpioMode(ch, pp);
+
+  pwm_tbl[ch].is_open = true;
+  	break;
   }
 
   return true;
@@ -279,6 +377,32 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle)
 
   /* USER CODE END TIM4_MspInit 1 */
   }
+  else if(tim_pwmHandle->Instance==TIM5)
+  {
+  /* USER CODE BEGIN TIM5_MspInit 0 */
+
+  /* USER CODE END TIM5_MspInit 0 */
+    /* TIM5 clock enable */
+    __HAL_RCC_TIM5_CLK_ENABLE();
+
+    /* TIM5 interrupt Init */
+    HAL_NVIC_SetPriority(TIM5_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM5_IRQn);
+  /* USER CODE BEGIN TIM5_MspInit 1 */
+
+  /* USER CODE END TIM5_MspInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM15)
+  {
+  /* USER CODE BEGIN TIM15_MspInit 0 */
+
+  /* USER CODE END TIM15_MspInit 0 */
+    /* TIM15 clock enable */
+    __HAL_RCC_TIM15_CLK_ENABLE();
+  /* USER CODE BEGIN TIM15_MspInit 1 */
+
+  /* USER CODE END TIM15_MspInit 1 */
+  }
 }
 
 void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* tim_pwmHandle)
@@ -325,6 +449,31 @@ void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* tim_pwmHandle)
   /* USER CODE BEGIN TIM4_MspDeInit 1 */
 
   /* USER CODE END TIM4_MspDeInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM5)
+  {
+  /* USER CODE BEGIN TIM5_MspDeInit 0 */
+
+  /* USER CODE END TIM5_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM5_CLK_DISABLE();
+
+    /* TIM5 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(TIM5_IRQn);
+  /* USER CODE BEGIN TIM5_MspDeInit 1 */
+
+  /* USER CODE END TIM5_MspDeInit 1 */
+  }
+  else if(tim_pwmHandle->Instance==TIM15)
+  {
+  /* USER CODE BEGIN TIM15_MspDeInit 0 */
+
+  /* USER CODE END TIM15_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM15_CLK_DISABLE();
+  /* USER CODE BEGIN TIM15_MspDeInit 1 */
+
+  /* USER CODE END TIM15_MspDeInit 1 */
   }
 }
 
@@ -421,13 +570,29 @@ bool pwmSetGpioMode(uint8_t ch, uint32_t mode)
 
     case _DEF_PWM3:
       GPIO_InitStruct.Pin       = GPIO_PIN_6;
-      GPIO_InitStruct.Mode 		= mode;
-      GPIO_InitStruct.Pull 		= GPIO_NOPULL;
-      GPIO_InitStruct.Speed 	= GPIO_SPEED_FREQ_LOW;
+      GPIO_InitStruct.Mode 			= mode;
+      GPIO_InitStruct.Pull 			= GPIO_NOPULL;
+      GPIO_InitStruct.Speed 		= GPIO_SPEED_FREQ_LOW;
       GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
       HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
       break;
+    case _DEF_PWM4:
+    	GPIO_InitStruct.Pin 			= GPIO_PIN_2;
+    	GPIO_InitStruct.Mode 			= mode;
+    	GPIO_InitStruct.Pull 			= GPIO_NOPULL;
+    	GPIO_InitStruct.Speed 		= GPIO_SPEED_FREQ_LOW;
+    	GPIO_InitStruct.Alternate = GPIO_AF2_TIM5;
+    	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    	break;
+    	GPIO_InitStruct.Pin 			= GPIO_PIN_14;
+    	GPIO_InitStruct.Mode 			= mode;
+    	GPIO_InitStruct.Pull 			= GPIO_NOPULL;
+    	GPIO_InitStruct.Speed 		= GPIO_SPEED_FREQ_LOW;
+    	GPIO_InitStruct.Alternate = GPIO_AF1_TIM15;
+    	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    case _DEF_PWM5:
 
+    	break;
     default:
       return false;
   }

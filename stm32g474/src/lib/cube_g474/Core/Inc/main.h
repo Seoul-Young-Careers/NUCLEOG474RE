@@ -69,8 +69,12 @@ void Error_Handler(void);
 #define BUTTON_STOP_GPIO_Port GPIOC
 #define BUTTON_RESET_Pin GPIO_PIN_5
 #define BUTTON_RESET_GPIO_Port GPIOC
+#define bts7960_1_Pin GPIO_PIN_2
+#define bts7960_1_GPIO_Port GPIOB
 #define SN04_2_Pin GPIO_PIN_10
 #define SN04_2_GPIO_Port GPIOB
+#define bts7960_2_Pin GPIO_PIN_14
+#define bts7960_2_GPIO_Port GPIOB
 #define VALVE_2_Pin GPIO_PIN_7
 #define VALVE_2_GPIO_Port GPIOC
 #define SN04_1_Pin GPIO_PIN_8

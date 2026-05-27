@@ -60,6 +60,7 @@
 #define _DEF_PWM2							1
 #define _DEF_PWM3							2
 #define _DEF_PWM4							3
+#define _DEF_PWM5							4
 
 #define _DEF_DS3120MG1				0
 #define _DEF_DS3120MG2				1
@@ -75,6 +76,11 @@
 #define _DEF_DM542_2					1
 #define _DEF_DM542_3					2
 #define _DEF_DM542_4					3
+
+#define _DEF_BTS7960_1					0
+#define _DEF_BTS7960_2					1
+#define _DEF_BTS7960_3					2
+#define _DEF_BTS7960_4					3
 
 #define _DEF_SN04_1						0
 #define _DEF_SN04_2						1
