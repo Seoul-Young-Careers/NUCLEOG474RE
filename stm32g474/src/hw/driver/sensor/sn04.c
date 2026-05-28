@@ -38,7 +38,16 @@ static const sn04_pin_t sn04_pin_tbl[SN04_MAX_CH] =
   {GPIOB, GPIO_PIN_10, GPIO_PIN_RESET},
 };
 
+static const IRQn_Type sn04_irq_tbl[SN04_MAX_CH] =
+{
+  EXTI9_5_IRQn,    /* PA8  -> EXTI line 8  */
+  EXTI15_10_IRQn,  /* PB10 -> EXTI line 10 */
+};
+
+#define SN04_EXTI_IRQ_PRIO   5U
+
 static sn04_tbl_t sn04_tbl[SN04_MAX_CH];
+static volatile sn04_isr_cb_t sn04_isr_cb = NULL;
 
 static bool sn04Lock(void);
 static void sn04Unlock(void);
@@ -71,7 +80,8 @@ bool sn04Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /* EXTI 양 edge 트리거 (NPN 센서: 감지 LOW / 해제 HIGH 모두 알림) */
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
 
   for(uint8_t i = 0; i < SN04_MAX_CH; i++)
@@ -81,6 +91,13 @@ bool sn04Init(void)
 
     sn04_tbl[i].is_ready    = true;
     sn04_tbl[i].is_detected = false;
+  }
+
+  /* 같은 IRQn을 두 번 호출해도 무방 (HAL이 중복 무시) */
+  for(uint8_t i = 0; i < SN04_MAX_CH; i++)
+  {
+    HAL_NVIC_SetPriority(sn04_irq_tbl[i], SN04_EXTI_IRQ_PRIO, 0U);
+    HAL_NVIC_EnableIRQ(sn04_irq_tbl[i]);
   }
 
 #ifdef _USE_HW_CLI
@@ -133,6 +150,50 @@ bool sn04Read(uint8_t ch)
 bool sn04IsDetected(uint8_t ch)
 {
   return sn04Read(ch);
+}
+
+bool sn04SetIsrCallback(sn04_isr_cb_t cb)
+{
+  sn04_isr_cb = cb;
+  return true;
+}
+
+/* ISR-safe: 뮤텍스 미사용, HAL_GPIO_ReadPin은 단순 레지스터 read */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  for(uint8_t i = 0; i < SN04_MAX_CH; i++)
+  {
+    if(sn04_pin_tbl[i].pin != GPIO_Pin) continue;
+
+    bool detected = (HAL_GPIO_ReadPin(sn04_pin_tbl[i].port,
+                                      sn04_pin_tbl[i].pin)
+                     == sn04_pin_tbl[i].on_state);
+
+    sn04_tbl[i].is_detected = detected;
+
+    sn04_isr_cb_t cb = sn04_isr_cb;
+    if(cb != NULL)
+    {
+      cb((uint8_t)i, detected);
+    }
+    break;
+  }
+}
+
+/*
+ * EXTI IRQ 핸들러를 sn04 드라이버 안에서 직접 override.
+ * (startup_stm32g474retx.s 의 weak symbol을 덮어씀)
+ *   PA8  -> EXTI line 8  -> EXTI9_5_IRQHandler
+ *   PB10 -> EXTI line 10 -> EXTI15_10_IRQHandler
+ */
+void EXTI9_5_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8);
+}
+
+void EXTI15_10_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
 }
 
 bool sn04ReadData(uint8_t ch, sn04_data_t *p_data)

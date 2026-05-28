@@ -10,6 +10,7 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "event_groups.h"
 
 TIM_HandleTypeDef        htim7;
 
@@ -39,29 +40,64 @@ static const osThreadAttr_t threadLed_attributes =
   .priority   = _HW_DEF_RTOS_THREAD_PRI_LED,
 };
 
-static StaticTask_t threadMotor_cb;
-static StackType_t  threadMotor_stack[_HW_DEF_RTOS_THREAD_MEM_MOTOR / sizeof(StackType_t)];
+static StaticTask_t threadStepMotor_cb;
+static StackType_t  threadStepMotor_stack[_HW_DEF_RTOS_THREAD_MEM_STEP_MOTOR / sizeof(StackType_t)];
 
-static const osThreadAttr_t threadMotor_attributes =
+static const osThreadAttr_t threadStepMotor_attributes =
 {
-  .name       = "threadMotor",
-  .cb_mem     = &threadMotor_cb,
-  .cb_size    = sizeof(threadMotor_cb),
-  .stack_mem  = threadMotor_stack,
-  .stack_size = sizeof(threadMotor_stack),
-  .priority   = _HW_DEF_RTOS_THREAD_PRI_MOTOR,
+  .name       = "threadStepMotor",
+  .cb_mem     = &threadStepMotor_cb,
+  .cb_size    = sizeof(threadStepMotor_cb),
+  .stack_mem  = threadStepMotor_stack,
+  .stack_size = sizeof(threadStepMotor_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_STEP_MOTOR,
 };
 
-static StaticQueue_t motorMsgQ_cb;
-static uint8_t       motorMsgQ_buf[_HW_DEF_RTOS_MSG_Q_MOTOR * sizeof(rtos_motor_msg_t)];
+static StaticQueue_t stepMotorMsgQ_cb;
+static uint8_t       stepMotorMsgQ_buf[_HW_DEF_RTOS_MSG_Q_STEP_MOTOR * sizeof(rtos_step_motor_msg_t)];
 
-static const osMessageQueueAttr_t motorMsgQ_attributes =
+static const osMessageQueueAttr_t stepMotorMsgQ_attributes =
 {
-  .name    = "motorMsgQ",
-  .cb_mem  = &motorMsgQ_cb,
-  .cb_size = sizeof(motorMsgQ_cb),
-  .mq_mem  = motorMsgQ_buf,
-  .mq_size = sizeof(motorMsgQ_buf),
+  .name    = "stepMotorMsgQ",
+  .cb_mem  = &stepMotorMsgQ_cb,
+  .cb_size = sizeof(stepMotorMsgQ_cb),
+  .mq_mem  = stepMotorMsgQ_buf,
+  .mq_size = sizeof(stepMotorMsgQ_buf),
+};
+
+static StaticTask_t threadButton_cb;
+static StackType_t  threadButton_stack[_HW_DEF_RTOS_THREAD_MEM_BUTTON / sizeof(StackType_t)];
+
+static const osThreadAttr_t threadButton_attributes =
+{
+  .name       = "threadButton",
+  .cb_mem     = &threadButton_cb,
+  .cb_size    = sizeof(threadButton_cb),
+  .stack_mem  = threadButton_stack,
+  .stack_size = sizeof(threadButton_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_BUTTON,
+};
+
+static StaticTask_t threadSensor_cb;
+static StackType_t  threadSensor_stack[_HW_DEF_RTOS_THREAD_MEM_SENSOR / sizeof(StackType_t)];
+
+static const osThreadAttr_t threadSensor_attributes =
+{
+  .name       = "threadSensor",
+  .cb_mem     = &threadSensor_cb,
+  .cb_size    = sizeof(threadSensor_cb),
+  .stack_mem  = threadSensor_stack,
+  .stack_size = sizeof(threadSensor_stack),
+  .priority   = _HW_DEF_RTOS_THREAD_PRI_SENSOR,
+};
+
+static StaticEventGroup_t appEvent_cb;
+
+static const osEventFlagsAttr_t appEvent_attributes =
+{
+  .name    = "appEvent",
+  .cb_mem  = &appEvent_cb,
+  .cb_size = sizeof(appEvent_cb),
 };
 
 const osThreadAttr_t *rtosGetMainThreadAttr(void)
@@ -74,14 +110,29 @@ const osThreadAttr_t *rtosGetLedThreadAttr(void)
   return &threadLed_attributes;
 }
 
-const osThreadAttr_t *rtosGetMotorThreadAttr(void)
+const osThreadAttr_t *rtosGetStepMotorThreadAttr(void)
 {
-  return &threadMotor_attributes;
+  return &threadStepMotor_attributes;
 }
 
-const osMessageQueueAttr_t *rtosGetMotorMsgQAttr(void)
+const osMessageQueueAttr_t *rtosGetStepMotorMsgQAttr(void)
 {
-  return &motorMsgQ_attributes;
+  return &stepMotorMsgQ_attributes;
+}
+
+const osThreadAttr_t *rtosGetButtonThreadAttr(void)
+{
+  return &threadButton_attributes;
+}
+
+const osThreadAttr_t *rtosGetSensorThreadAttr(void)
+{
+  return &threadSensor_attributes;
+}
+
+const osEventFlagsAttr_t *rtosGetAppEventAttr(void)
+{
+  return &appEvent_attributes;
 }
 
 bool rtosInit(void)

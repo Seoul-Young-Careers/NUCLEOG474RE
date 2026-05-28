@@ -38,6 +38,10 @@
 //#define		HW_LCD_WIDTH							160
 //#define 	HW_LCD_HEIGHT     				160
 
+
+//#define _USE_HX711
+//#define 	HW_HX711_MAX							1
+
 #define _USE_PWM
 #define 	HW_PWM_MAX_CH							5
 
@@ -46,11 +50,6 @@
 
 #define _USE_BTS7960
 #define		HW_BTS7960_MAX_CH					1
-
-/*
-#define _USE_HX711
-#define 	HW_HX711_MAX							1
-*/
 
 #define _USE_DS3120MG
 #define		HW_DS3120MG_MAX						2
