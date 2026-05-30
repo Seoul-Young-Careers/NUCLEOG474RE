@@ -8,26 +8,29 @@
 #include "task/task_stepmotor.h"
 #include "task/app_event.h"
 
-#ifdef _USE_HW_CLI
-static void cliStepMotor(cli_args_t *args);
-#endif
+#define STEP_MOTOR_RUN_CH              _DEF_DM542_1
+#define STEP_MOTOR_IDLE_MS             1U
+#define STEP_MOTOR_PULSE_DELAY_US      1000U
+#define STEP_MOTOR_TRAVEL_MAX_STEPS    100000
 
-#define STEP_MOTOR_RUN_CH       _DEF_DM542_1
-#define STEP_MOTOR_RUN_STEP     1
-#define STEP_MOTOR_RUN_DELAY_US 1000U
-#define STEP_MOTOR_IDLE_MS      1U
-#define STEP_MOTOR_LIMIT_EVT    (APP_EVT_SN04_1_DETECTED | APP_EVT_SN04_2_DETECTED)
-#define STEP_MOTOR_REQ_STOP_EVT (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ)
-#define STEP_MOTOR_STOP_EVT     (STEP_MOTOR_REQ_STOP_EVT | STEP_MOTOR_LIMIT_EVT)
+#define STEP_MOTOR_HOME_DIR            (-1)
+#define STEP_MOTOR_END_DIR             1
 
-#define STEP_MOTOR_HOMING_DIR        (-1)
-#define STEP_MOTOR_HOMING_DELAY_US   1000U
-#define STEP_MOTOR_HOMING_MAX_STEPS  100000U
+#define STEP_MOTOR_CONTROL_EVT         (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ)
 
 static osMessageQueueId_t step_motor_msg_q = NULL;
+static osMessageQueueId_t step_motor_ack_q = NULL;
+static uint32_t step_motor_cmd_id = 0U;
 
 static void threadStepMotor(void *argument);
-static void taskStepMotorHoming(void);
+static uint32_t taskStepMotorNextCmdId(void);
+static bool taskStepMotorPutMsg(rtos_step_motor_msg_t *p_msg, uint32_t *p_cmd_id, bool clear_queue);
+static void taskStepMotorSendAck(const rtos_step_motor_msg_t *p_msg, rtos_step_motor_ack_result_t result);
+static void taskStepMotorStopCurrent(uint8_t ch);
+
+#ifdef _USE_SN04
+static bool taskStepMotorIsTargetDetected(uint32_t target_evt);
+#endif
 
 bool taskStepMotorInit(void)
 {
@@ -43,9 +46,17 @@ bool taskStepMotorInit(void)
 
   logPrintf("stepMotorMsgQ \t\t: OK\r\n");
 
-#ifdef _USE_HW_CLI
-  cliAdd("stepmotor", cliStepMotor);
-#endif
+  step_motor_ack_q = osMessageQueueNew(_HW_DEF_RTOS_MSG_Q_STEP_MOTOR_ACK,
+                                       sizeof(rtos_step_motor_ack_t),
+                                       rtosGetStepMotorAckQAttr());
+
+  if(step_motor_ack_q == NULL)
+  {
+    logPrintf("stepMotorAckQ \t\t: Fail\r\n");
+    return false;
+  }
+
+  logPrintf("stepMotorAckQ \t\t: OK\r\n");
 
   if(osThreadNew(threadStepMotor, NULL, rtosGetStepMotorThreadAttr()) == NULL)
   {
@@ -55,16 +66,13 @@ bool taskStepMotorInit(void)
 
   logPrintf("threadStepMotor \t: OK\r\n");
 
-  taskStepMotorHoming();
-
   return true;
 }
 
-bool apStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
+bool taskStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us, uint32_t *p_cmd_id)
 {
   rtos_step_motor_msg_t msg;
 
-  if(step_motor_msg_q == NULL) return false;
   if(pulse_delay_us == 0U) return false;
 
   msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_STEP;
@@ -72,62 +80,104 @@ bool apStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
   msg.step           = step;
   msg.pulse_delay_us = pulse_delay_us;
 
-  return osMessageQueuePut(step_motor_msg_q, &msg, 0U, 10U) == osOK;
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
 }
 
-static void taskStepMotorHoming(void)
+bool taskStepMotorMoveToHome(uint32_t *p_cmd_id)
 {
-#ifdef _USE_SN04
-  if(sn04IsDetected(_DEF_SN04_1) != true)
+  rtos_step_motor_msg_t msg;
+
+  msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME;
+  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.step           = STEP_MOTOR_HOME_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
+  msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
+}
+
+bool taskStepMotorMoveToEnd(uint32_t *p_cmd_id)
+{
+  rtos_step_motor_msg_t msg;
+
+  msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_END;
+  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.step           = STEP_MOTOR_END_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
+  msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
+}
+
+bool taskStepMotorStop(uint32_t *p_cmd_id)
+{
+  rtos_step_motor_msg_t msg;
+
+  msg.cmd            = RTOS_STEP_MOTOR_CMD_STOP;
+  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.step           = 0;
+  msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
+}
+
+bool taskStepMotorGetAck(rtos_step_motor_ack_t *p_ack, uint32_t timeout_ms)
+{
+  if(step_motor_ack_q == NULL) return false;
+  if(p_ack == NULL) return false;
+
+  return osMessageQueueGet(step_motor_ack_q, p_ack, NULL, timeout_ms) == osOK;
+}
+
+static uint32_t taskStepMotorNextCmdId(void)
+{
+  step_motor_cmd_id++;
+  if(step_motor_cmd_id == 0U)
   {
-    int32_t homing_step;
-
-    logPrintf("homing \t\t: start\r\n");
-
-    (void)appEventClear(STEP_MOTOR_LIMIT_EVT);
-
-    homing_step = (int32_t)STEP_MOTOR_HOMING_MAX_STEPS * STEP_MOTOR_HOMING_DIR;
-
-    if(apStepMotorMoveStep(STEP_MOTOR_RUN_CH,
-                           homing_step,
-                           STEP_MOTOR_HOMING_DELAY_US) == true)
-    {
-      uint32_t evt;
-
-      evt = appEventWait(APP_EVT_SN04_1_DETECTED,
-                         osFlagsWaitAny | osFlagsNoClear,
-                         osWaitForever);
-
-      if((evt & osFlagsError) == 0U)
-      {
-        logPrintf("homing \t\t: done\r\n");
-      }
-      else
-      {
-        logPrintf("homing \t\t: wait fail (0x%lx)\r\n", (unsigned long)evt);
-      }
-    }
-    else
-    {
-      logPrintf("homing \t\t: queue put fail\r\n");
-    }
-
-    (void)appEventSet(APP_EVT_STOP_REQ);
+    step_motor_cmd_id++;
   }
-  else
+
+  return step_motor_cmd_id;
+}
+
+static bool taskStepMotorPutMsg(rtos_step_motor_msg_t *p_msg, uint32_t *p_cmd_id, bool clear_queue)
+{
+  uint32_t cmd_id;
+
+  if(step_motor_msg_q == NULL) return false;
+  if(step_motor_ack_q == NULL) return false;
+  if(p_msg == NULL) return false;
+
+  if(clear_queue == true)
   {
-    logPrintf("homing \t\t: skip (already at SN04_1)\r\n");
+    (void)osMessageQueueReset(step_motor_msg_q);
+    (void)osMessageQueueReset(step_motor_ack_q);
   }
-#endif
+
+  cmd_id = taskStepMotorNextCmdId();
+  p_msg->cmd_id = cmd_id;
+
+  if(osMessageQueuePut(step_motor_msg_q, p_msg, 0U, 10U) != osOK)
+  {
+    return false;
+  }
+
+  if(p_cmd_id != NULL)
+  {
+    *p_cmd_id = cmd_id;
+  }
+
+  return true;
 }
 
 static void threadStepMotor(void *argument)
 {
   rtos_step_motor_msg_t msg;
-  bool is_button_run = false;
-  uint8_t move_ch = 0U;
+  rtos_step_motor_msg_t active_msg = {0};
+  bool has_active_msg = false;
+  uint8_t move_ch = STEP_MOTOR_RUN_CH;
   int32_t move_remain_step = 0;
-  uint32_t move_pulse_delay_us = 0U;
+  uint32_t move_pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+  uint32_t target_evt = 0U;
+  bool is_target_move = false;
 
   UNUSED(argument);
 
@@ -136,47 +186,118 @@ static void threadStepMotor(void *argument)
     uint32_t evt_flags;
 
     evt_flags = appEventGet();
+    if((evt_flags & STEP_MOTOR_CONTROL_EVT) != 0U)
+    {
+      move_remain_step = 0;
+      target_evt = 0U;
+      is_target_move = false;
+      taskStepMotorStopCurrent(move_ch);
 
-    if((evt_flags & STEP_MOTOR_STOP_EVT) != 0U)
-    {
-      is_button_run = false;
-      move_remain_step = 0;
-      (void)dm542Stop(STEP_MOTOR_RUN_CH);
-      (void)appEventClear(APP_EVT_START_REQ | STEP_MOTOR_REQ_STOP_EVT);
-    }
-    else if((evt_flags & APP_EVT_START_REQ) != 0U)
-    {
-      is_button_run = true;
-      move_remain_step = 0;
-      (void)appEventClear(APP_EVT_START_REQ);
+      if(has_active_msg == true)
+      {
+        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_STOPPED);
+        has_active_msg = false;
+      }
+
+      osDelay(STEP_MOTOR_IDLE_MS);
+      continue;
     }
 
     if(osMessageQueueGet(step_motor_msg_q, &msg, NULL, 0U) == osOK)
     {
+      if(has_active_msg == true)
+      {
+        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_STOPPED);
+      }
+
+      active_msg = msg;
+      has_active_msg = true;
+      move_ch = msg.ch;
+      move_pulse_delay_us = msg.pulse_delay_us;
+      target_evt = 0U;
+      is_target_move = false;
+
       switch(msg.cmd)
       {
         case RTOS_STEP_MOTOR_CMD_MOVE_STEP:
-          is_button_run = false;
-          move_ch = msg.ch;
           move_remain_step = msg.step;
-          move_pulse_delay_us = msg.pulse_delay_us;
+          if(move_remain_step == 0)
+          {
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+            has_active_msg = false;
+          }
+          break;
+
+        case RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME:
+#ifdef _USE_SN04
+          target_evt = APP_EVT_SN04_1_DETECTED;
+          is_target_move = true;
+
+          if(taskStepMotorIsTargetDetected(target_evt) == true)
+          {
+            move_remain_step = 0;
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+            has_active_msg = false;
+          }
+          else
+          {
+            move_remain_step = msg.step;
+          }
+#else
+          move_remain_step = 0;
+          taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+          has_active_msg = false;
+#endif
+          break;
+
+        case RTOS_STEP_MOTOR_CMD_MOVE_TO_END:
+#ifdef _USE_SN04
+          target_evt = APP_EVT_SN04_2_DETECTED;
+          is_target_move = true;
+
+          if(taskStepMotorIsTargetDetected(target_evt) == true)
+          {
+            move_remain_step = 0;
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+            has_active_msg = false;
+          }
+          else
+          {
+            move_remain_step = msg.step;
+          }
+#else
+          move_remain_step = 0;
+          taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+          has_active_msg = false;
+#endif
+          break;
+
+        case RTOS_STEP_MOTOR_CMD_STOP:
+          move_remain_step = 0;
+          taskStepMotorStopCurrent(move_ch);
+          taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+          has_active_msg = false;
           break;
 
         default:
+          move_remain_step = 0;
+          taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+          has_active_msg = false;
           break;
       }
     }
 
-    evt_flags = appEventGet();
-    if((evt_flags & STEP_MOTOR_STOP_EVT) != 0U)
+#ifdef _USE_SN04
+    if((has_active_msg == true) && (target_evt != 0U) && (taskStepMotorIsTargetDetected(target_evt) == true))
     {
-      is_button_run = false;
       move_remain_step = 0;
-      (void)dm542Stop(STEP_MOTOR_RUN_CH);
-      (void)appEventClear(STEP_MOTOR_REQ_STOP_EVT);
+      taskStepMotorStopCurrent(move_ch);
+      taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+      has_active_msg = false;
       osDelay(STEP_MOTOR_IDLE_MS);
       continue;
     }
+#endif
 
     if(move_remain_step != 0)
     {
@@ -185,17 +306,26 @@ static void threadStepMotor(void *argument)
       if(dm542MoveStep(move_ch, step, move_pulse_delay_us) == true)
       {
         move_remain_step -= step;
+
+        if(move_remain_step == 0)
+        {
+          if(is_target_move == true)
+          {
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+          }
+          else
+          {
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+          }
+
+          has_active_msg = false;
+        }
       }
       else
       {
         move_remain_step = 0;
-      }
-    }
-    else if(is_button_run == true)
-    {
-      if(dm542MoveStep(STEP_MOTOR_RUN_CH, STEP_MOTOR_RUN_STEP, STEP_MOTOR_RUN_DELAY_US) != true)
-      {
-        is_button_run = false;
+        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+        has_active_msg = false;
       }
     }
     else
@@ -205,74 +335,43 @@ static void threadStepMotor(void *argument)
   }
 }
 
-#ifdef _USE_HW_CLI
-static void cliStepMotor(cli_args_t *args)
+static void taskStepMotorSendAck(const rtos_step_motor_msg_t *p_msg, rtos_step_motor_ack_result_t result)
 {
-  bool ret = false;
-  bool cmd_ret;
-  uint8_t ch;
-  int32_t step;
-  uint32_t value;
+  rtos_step_motor_ack_t ack;
 
-  if(args->argc == 1)
+  if(step_motor_ack_q == NULL) return;
+  if(p_msg == NULL) return;
+  if(p_msg->cmd_id == 0U) return;
+
+  ack.cmd_id = p_msg->cmd_id;
+  ack.cmd    = p_msg->cmd;
+  ack.result = result;
+
+  if(osMessageQueuePut(step_motor_ack_q, &ack, 0U, 0U) != osOK)
   {
-    if(args->isStr(0, "show") == true)
-    {
-      cliPrintf("stepmotor queue count:%lu space:%lu\n",
-                (unsigned long)osMessageQueueGetCount(step_motor_msg_q),
-                (unsigned long)osMessageQueueGetSpace(step_motor_msg_q));
-
-      for(uint8_t i = 0; i < DM542_MAX_CH; i++)
-      {
-        cliPrintf("stepmotor %d open:%d busy:%d\n",
-                  i,
-                  dm542IsOpen(i),
-                  dm542IsBusy(i));
-      }
-
-      ret = true;
-    }
+    (void)osMessageQueueReset(step_motor_ack_q);
+    (void)osMessageQueuePut(step_motor_ack_q, &ack, 0U, 0U);
   }
+}
 
-  if(args->argc == 3)
+static void taskStepMotorStopCurrent(uint8_t ch)
+{
+  (void)dm542Stop(ch);
+}
+
+#ifdef _USE_SN04
+static bool taskStepMotorIsTargetDetected(uint32_t target_evt)
+{
+  switch(target_evt)
   {
-    ch   = (uint8_t)args->getData(1);
-    step = args->getData(2);
+    case APP_EVT_SN04_1_DETECTED:
+      return sn04IsDetected(_DEF_SN04_1);
 
-    if(args->isStr(0, "run") == true)
-    {
-      cmd_ret = apStepMotorMoveStep(ch, step, 1000U);
-      cliPrintf("stepmotor run %d %ld : %s\n",
-                ch,
-                (long)step,
-                cmd_ret ? "QUEUED" : "FAIL");
-      ret = true;
-    }
-  }
+    case APP_EVT_SN04_2_DETECTED:
+      return sn04IsDetected(_DEF_SN04_2);
 
-  if(args->argc == 4)
-  {
-    ch    = (uint8_t)args->getData(1);
-    step  = args->getData(2);
-    value = (uint32_t)args->getData(3);
-
-    if(args->isStr(0, "move") == true)
-    {
-      cmd_ret = apStepMotorMoveStep(ch, step, value);
-      cliPrintf("stepmotor move %d %ld %luus : %s\n",
-                ch,
-                (long)step,
-                value,
-                cmd_ret ? "QUEUED" : "FAIL");
-      ret = true;
-    }
-  }
-
-  if(ret != true)
-  {
-    cliPrintf("stepmotor show\n");
-    cliPrintf("stepmotor run  ch[0~%d] step\n", DM542_MAX_CH - 1);
-    cliPrintf("stepmotor move ch[0~%d] step pulse_delay_us\n", DM542_MAX_CH - 1);
+    default:
+      return false;
   }
 }
 #endif

@@ -15,7 +15,11 @@ extern "C" {
 #endif
 
 bool taskStepMotorInit(void);
-bool apStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us);
+bool taskStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us, uint32_t *p_cmd_id);
+bool taskStepMotorMoveToHome(uint32_t *p_cmd_id);
+bool taskStepMotorMoveToEnd(uint32_t *p_cmd_id);
+bool taskStepMotorStop(uint32_t *p_cmd_id);
+bool taskStepMotorGetAck(rtos_step_motor_ack_t *p_ack, uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

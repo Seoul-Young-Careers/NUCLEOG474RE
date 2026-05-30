@@ -36,9 +36,8 @@ typedef struct
 static const v025_pin_t v025_pin_tbl[V025_MAX_CH] =
 {
   {GPIOA, GPIO_PIN_9, GPIO_PIN_SET, GPIO_PIN_RESET},
-#if V025_MAX_CH > 1
   {GPIOC, GPIO_PIN_7, GPIO_PIN_SET, GPIO_PIN_RESET},
-#endif
+
 };
 
 static v025_tbl_t v025_tbl[V025_MAX_CH];

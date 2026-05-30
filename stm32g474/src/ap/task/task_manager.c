@@ -12,6 +12,7 @@
 #include "task/task_dcmotor.h"
 #include "task/task_led.h"
 #include "task/task_sensor.h"
+#include "task/task_sequence.h"
 #include "task/task_servo.h"
 #include "task/task_stepmotor.h"
 #include "task/task_valve.h"
@@ -40,6 +41,8 @@ bool taskManagerInit(void)
 #ifdef _USE_DM542
   if(taskStepMotorInit() != true) return false;
 #endif
+
+  if(taskManagerCheck("threadSequence", taskSequenceInit()) != true) return false;
 
   return true;
 }

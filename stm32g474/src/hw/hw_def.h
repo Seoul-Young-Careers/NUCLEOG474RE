@@ -58,7 +58,7 @@
 #define		HW_SN04_MAX_CH						2
 
 #define _USE_2V025
-#define		HW_2V025_MAX_CH						1
+#define		HW_2V025_MAX_CH						2
 
 
 #endif /* SRC_HW_HW_DEF_H_ */

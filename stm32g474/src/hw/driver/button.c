@@ -12,16 +12,18 @@ typedef struct
 {
 	GPIO_TypeDef  *port;
 	uint32_t		pin;
-	GPIO_PinState	on_state;
 
 } button_tbl_t;
 
+#define BUTTON_IDLE_PULL       GPIO_PULLUP
+#define BUTTON_PRESSED_STATE   GPIO_PIN_RESET
+
 button_tbl_t button_tbl[BUTTON_MAX_CH] =
 {
-		{GPIOC,GPIO_PIN_5,GPIO_PIN_RESET},					//RESET
-		{GPIOC,GPIO_PIN_4,GPIO_PIN_RESET},					//STOP
-		{GPIOA,GPIO_PIN_10,GPIO_PIN_RESET},					//START
-		{GPIOB,GPIO_PIN_3,GPIO_PIN_RESET},					//FOOT SWITCH
+		{GPIOC,GPIO_PIN_5},					//RESET
+		{GPIOC,GPIO_PIN_4},					//STOP
+		{GPIOA,GPIO_PIN_10},					//START
+		{GPIOB,GPIO_PIN_3},					//FOOT SWITCH
 };
 
 #ifdef _USE_HW_CLI
@@ -39,6 +41,8 @@ static const osMutexAttr_t button_mutex_attr =
 
 static bool buttonLock(void);
 static void buttonUnlock(void);
+static GPIO_PinState buttonReadRaw(uint8_t ch);
+static bool buttonIsPressedRaw(uint8_t ch);
 
 bool buttonInit(void)
 {
@@ -64,7 +68,7 @@ bool buttonInit(void)
 
 	/*Configure GPIO pin : PA0 */
 	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	GPIO_InitStruct.Pull = BUTTON_IDLE_PULL;
 
 	for(int i = 0; i < BUTTON_MAX_CH; i++)
 	{
@@ -85,10 +89,7 @@ bool buttonGetPressed(uint8_t ch)
 
 	if(ch < BUTTON_MAX_CH)
 	{
-		if(HAL_GPIO_ReadPin(button_tbl[ch].port, button_tbl[ch].pin) == button_tbl[ch].on_state)
-		{
-			ret = true;
-		}
+		ret = buttonIsPressedRaw(ch);
 	}
 
 	buttonUnlock();
@@ -140,6 +141,16 @@ static void buttonUnlock(void)
 #endif
 }
 
+static GPIO_PinState buttonReadRaw(uint8_t ch)
+{
+	return HAL_GPIO_ReadPin(button_tbl[ch].port, button_tbl[ch].pin);
+}
+
+static bool buttonIsPressedRaw(uint8_t ch)
+{
+	return buttonReadRaw(ch) == BUTTON_PRESSED_STATE;
+}
+
 
 
 #ifdef _USE_HW_CLI
@@ -157,7 +168,10 @@ void cliButton(cli_args_t * args)
 
 				if(buttonReadData((uint8_t)i, &data) == true)
 				{
-					cliPrintf("%d", data.is_pressed);
+					cliPrintf("%d:%d/%d ",
+										i,
+										buttonReadRaw((uint8_t)i) == GPIO_PIN_SET ? 1 : 0,
+										data.is_pressed);
 				}
 			}
 			cliPrintf("\r\n");

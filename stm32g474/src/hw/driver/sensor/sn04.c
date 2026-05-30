@@ -18,7 +18,6 @@ typedef struct
 {
   GPIO_TypeDef  *port;
   uint32_t       pin;
-  GPIO_PinState  on_state;
 } sn04_pin_t;
 
 typedef struct
@@ -29,13 +28,16 @@ typedef struct
 
 /*
  * SN04-N : NPN open-collector proximity sensor.
- *  - Detection -> output line pulled LOW
- *  - No detection -> floating/HIGH (with internal pull-up)
+ *  - Idle/no target -> internal pull-up makes the input HIGH
+ *  - Detected      -> sensor output pulls the input LOW
  */
+#define SN04_NPN_IDLE_PULL        GPIO_PULLUP
+#define SN04_NPN_DETECTED_STATE   GPIO_PIN_RESET
+
 static const sn04_pin_t sn04_pin_tbl[SN04_MAX_CH] =
 {
-  {GPIOA, GPIO_PIN_8, GPIO_PIN_RESET},
-  {GPIOB, GPIO_PIN_10, GPIO_PIN_RESET},
+  {GPIOA, GPIO_PIN_8},
+  {GPIOB, GPIO_PIN_10},
 };
 
 static const IRQn_Type sn04_irq_tbl[SN04_MAX_CH] =
@@ -51,6 +53,8 @@ static volatile sn04_isr_cb_t sn04_isr_cb = NULL;
 
 static bool sn04Lock(void);
 static void sn04Unlock(void);
+static GPIO_PinState sn04ReadRaw(uint8_t ch);
+static bool sn04ReadDetected(uint8_t ch);
 
 #ifdef _USE_HW_RTOS
 static osMutexId_t sn04_mutex = NULL;
@@ -82,7 +86,7 @@ bool sn04Init(void)
 
   /* EXTI 양 edge 트리거 (NPN 센서: 감지 LOW / 해제 HIGH 모두 알림) */
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = SN04_NPN_IDLE_PULL;
 
   for(uint8_t i = 0; i < SN04_MAX_CH; i++)
   {
@@ -90,7 +94,7 @@ bool sn04Init(void)
     HAL_GPIO_Init(sn04_pin_tbl[i].port, &GPIO_InitStruct);
 
     sn04_tbl[i].is_ready    = true;
-    sn04_tbl[i].is_detected = false;
+    sn04_tbl[i].is_detected = sn04ReadDetected(i);
   }
 
   /* 같은 IRQn을 두 번 호출해도 무방 (HAL이 중복 무시) */
@@ -134,10 +138,7 @@ bool sn04Read(uint8_t ch)
     if(ch >= SN04_MAX_CH) break;
     if(sn04_tbl[ch].is_ready != true) break;
 
-    if(HAL_GPIO_ReadPin(sn04_pin_tbl[ch].port, sn04_pin_tbl[ch].pin) == sn04_pin_tbl[ch].on_state)
-    {
-      ret = true;
-    }
+    ret = sn04ReadDetected(ch);
 
     sn04_tbl[ch].is_detected = ret;
   } while(0);
@@ -165,9 +166,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   {
     if(sn04_pin_tbl[i].pin != GPIO_Pin) continue;
 
-    bool detected = (HAL_GPIO_ReadPin(sn04_pin_tbl[i].port,
-                                      sn04_pin_tbl[i].pin)
-                     == sn04_pin_tbl[i].on_state);
+    bool detected = sn04ReadDetected(i);
 
     sn04_tbl[i].is_detected = detected;
 
@@ -242,6 +241,16 @@ static void sn04Unlock(void)
 #endif
 }
 
+static GPIO_PinState sn04ReadRaw(uint8_t ch)
+{
+  return HAL_GPIO_ReadPin(sn04_pin_tbl[ch].port, sn04_pin_tbl[ch].pin);
+}
+
+static bool sn04ReadDetected(uint8_t ch)
+{
+  return sn04ReadRaw(ch) == SN04_NPN_DETECTED_STATE;
+}
+
 #ifdef _USE_HW_CLI
 static void cliSn04(cli_args_t *args)
 {
@@ -255,9 +264,10 @@ static void cliSn04(cli_args_t *args)
       {
         for(uint8_t i = 0; i < SN04_MAX_CH; i++)
         {
-          cliPrintf("sn04 %d ready:%d detected:%d\n",
+          cliPrintf("sn04 %d ready:%d raw:%d detected:%d\n",
                     i,
                     sn04IsReady(i),
+                    sn04ReadRaw(i) == GPIO_PIN_SET ? 1 : 0,
                     sn04Read(i));
         }
         cliPrintf("\n");
@@ -270,9 +280,10 @@ static void cliSn04(cli_args_t *args)
     {
       for(uint8_t i = 0; i < SN04_MAX_CH; i++)
       {
-        cliPrintf("sn04 %d ready:%d detected:%d\n",
+        cliPrintf("sn04 %d ready:%d raw:%d detected:%d\n",
                   i,
                   sn04IsReady(i),
+                  sn04ReadRaw(i) == GPIO_PIN_SET ? 1 : 0,
                   sn04Read(i));
       }
       ret = true;
@@ -285,7 +296,13 @@ static void cliSn04(cli_args_t *args)
 
     if(args->isStr(0, "read") == true)
     {
-      cliPrintf("sn04 read %d : %d\n", ch, sn04Read(ch));
+      if(ch < SN04_MAX_CH)
+      {
+        cliPrintf("sn04 read %d : raw:%d detected:%d\n",
+                  ch,
+                  sn04ReadRaw(ch) == GPIO_PIN_SET ? 1 : 0,
+                  sn04Read(ch));
+      }
       ret = true;
     }
   }
