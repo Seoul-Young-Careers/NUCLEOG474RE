@@ -20,10 +20,10 @@ static void threadSequence(void *argument)
 {
   UNUSED(argument);
 
-  (void)appSequenceInit();
+  (void)sequenceInit();
 
   while(1)
   {
-    appSequenceProcess();
+    sequenceProcess();
   }
 }

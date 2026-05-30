@@ -16,7 +16,7 @@
 #define STEP_MOTOR_HOME_DIR            (-1)
 #define STEP_MOTOR_END_DIR             1
 
-#define STEP_MOTOR_CONTROL_EVT         (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ)
+#define STEP_MOTOR_CONTROL_EVT         APP_EVT_RESET_REQ
 
 static osMessageQueueId_t step_motor_msg_q = NULL;
 static osMessageQueueId_t step_motor_ack_q = NULL;

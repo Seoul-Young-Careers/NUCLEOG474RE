@@ -22,7 +22,7 @@ button_tbl_t button_tbl[BUTTON_MAX_CH] =
 {
 		{GPIOC,GPIO_PIN_5},					//RESET
 		{GPIOC,GPIO_PIN_4},					//STOP
-		{GPIOA,GPIO_PIN_10},					//START
+		{GPIOA,GPIO_PIN_10},				//START
 		{GPIOB,GPIO_PIN_3},					//FOOT SWITCH
 };
 

@@ -15,10 +15,16 @@
 
 #define APP_SEQUENCE_CONTROL_EVT    (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS)
 #define APP_SEQUENCE_ACK_WAIT_MS    10U
-#define APP_SEQUENCE_VALVE_CH       _DEF_2V025_1
+
 #define APP_SEQUENCE_SERVO_CH       _DEF_DS3120MG1
-#define APP_SEQUENCE_SERVO_HOME_ANGLE_DEG DS3120MG_ANGLE_DEG
-#define APP_SEQUENCE_SERVO_END_ANGLE_DEG 0.0f
+#define APP_SEQUENCE_VALVE1_CH      _DEF_2V025_1
+#define APP_SEQUENCE_VALVE2_CH      _DEF_2V025_2
+
+#define APP_SEQUENCE_SERVO_HOME_ANGLE_DEG 0.0f
+#define APP_SEQUENCE_SERVO_WORK_ANGLE_DEG 150.0f
+#define APP_SEQUENCE_SERVO_HOLD_ANGLE_DEG 120.0f
+
+#define APP_SEQUENCE_SERVO_WAIT_MS  500U
 
 typedef enum
 {
@@ -30,22 +36,44 @@ typedef enum
 
 static app_sequence_state_t app_sequence_state = APP_SEQUENCE_STATE_BOOT;
 
-static bool appSequenceHomeAll(void);
-static bool appSequenceMoveToHome(void);
-static bool appSequenceMoveToEnd(void);
-static bool appSequenceRunEndAction(void);
-static bool appSequenceRunFootCycle(void);
-static void appSequenceStopAllActuators(void);
-static bool appSequenceHandleResetOrStop(void);
-static app_sequence_wait_t appSequenceWaitStepMotor(uint32_t cmd_id);
-static void appSequenceSetState(app_sequence_state_t state);
+// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
+static bool runResetSequence(void);
+// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
+static bool runStopSequence(void);
+// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
+static bool runStartSequence(void);
+// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
+static bool runStartBeforeStepMove(void);
+// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
+static bool runStartAfterStepMove(void);
+// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
+static bool runFootSwitchSequence(void);
+// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
+static bool isStopSequenceAllowed(void);
 
-bool appSequenceInit(void)
+// reset/home 시 모든 구동부를 안전한 기본 상태로 되돌린다.
+static void stopAllActuators(void);
+
+// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
+static bool handleResetStopRequest(void);
+// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
+static bool servoMoveAndWait(float angle_deg);
+// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
+static bool delayInterruptible(uint32_t delay_ms);
+// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
+static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);
+
+// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
+static void setState(app_sequence_state_t state);
+
+// 장비 시퀀스를 시작할 때 전체 구동부를 초기 상태로 복귀한다.
+bool sequenceInit(void)
 {
-  return appSequenceHomeAll();
+  return runResetSequence();
 }
 
-void appSequenceProcess(void)
+// 버튼/센서 이벤트를 기다렸다가 reset, stop, start, foot 요청을 분기 처리한다.
+void sequenceProcess(void)
 {
   uint32_t evt;
 
@@ -62,171 +90,222 @@ void appSequenceProcess(void)
   if((evt & APP_EVT_RESET_REQ) != 0U)
   {
     (void)appEventClear(APP_SEQUENCE_CONTROL_EVT);
-    (void)appSequenceHomeAll();
+    (void)runResetSequence();
     return;
   }
 
   if((evt & APP_EVT_STOP_REQ) != 0U)
   {
-    (void)appEventClear(APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
-    (void)appSequenceMoveToHome();
+    if(isStopSequenceAllowed() == true)
+    {
+      (void)appEventClear(APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
+      (void)runStopSequence();
+    }
+    else
+    {
+      (void)appEventClear(APP_EVT_STOP_REQ);
+      logPrintf("sequence stop \t\t: ignored\r\n");
+    }
     return;
   }
 
   if((evt & APP_EVT_START_REQ) != 0U)
   {
     (void)appEventClear(APP_EVT_START_REQ);
-    (void)appSequenceMoveToEnd();
+    (void)runStartSequence();
     return;
   }
 
   if((evt & APP_EVT_FOOT_PRESS) != 0U)
   {
     (void)appEventClear(APP_EVT_FOOT_PRESS);
-    (void)appSequenceRunFootCycle();
+    (void)runFootSwitchSequence();
     return;
   }
 }
 
-app_sequence_state_t appSequenceGetState(void)
+// 외부에서 현재 시퀀스 상태를 확인할 수 있게 반환한다.
+app_sequence_state_t sequenceGetState(void)
 {
   return app_sequence_state;
 }
 
-static bool appSequenceHomeAll(void)
+// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
+static bool runResetSequence(void)
 {
   app_sequence_wait_t wait_result;
   uint32_t cmd_id;
 
-  appSequenceSetState(APP_SEQUENCE_STATE_HOMING);
+  setState(APP_SEQUENCE_STATE_HOMING);
 
   (void)appEventClear(APP_SEQUENCE_CONTROL_EVT);
-  appSequenceStopAllActuators();
+  stopAllActuators();
 
   if(taskStepMotorMoveToHome(&cmd_id) != true)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+    setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
-  wait_result = appSequenceWaitStepMotor(cmd_id);
+  wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_IDLE_HOME);
+    setState(APP_SEQUENCE_STATE_IDLE_HOME);
     return true;
   }
 
   if(wait_result == APP_SEQUENCE_WAIT_RESET)
   {
-    return appSequenceHomeAll();
+    return runResetSequence();
   }
 
-  appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+  setState(APP_SEQUENCE_STATE_ERROR);
 
   return false;
 }
 
-static bool appSequenceMoveToHome(void)
+// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
+static bool runStopSequence(void)
 {
   app_sequence_wait_t wait_result;
   uint32_t cmd_id;
 
-  appSequenceSetState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
+  setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
+
+  (void)taskValveClose(APP_SEQUENCE_VALVE1_CH);
+  (void)taskValveClose(APP_SEQUENCE_VALVE2_CH);
 
   if(taskStepMotorMoveToHome(&cmd_id) != true)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+    setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
-  wait_result = appSequenceWaitStepMotor(cmd_id);
+  wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_IDLE_HOME);
+    setState(APP_SEQUENCE_STATE_IDLE_HOME);
     return true;
   }
 
   if(wait_result == APP_SEQUENCE_WAIT_RESET)
   {
-    return appSequenceHomeAll();
+    (void)runResetSequence();
+    return false;
   }
 
-  appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+  setState(APP_SEQUENCE_STATE_ERROR);
 
   return false;
 }
 
-static bool appSequenceMoveToEnd(void)
+// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
+static bool runStartSequence(void)
 {
   app_sequence_wait_t wait_result;
   uint32_t cmd_id;
 
-  appSequenceSetState(APP_SEQUENCE_STATE_MOVING_TO_END);
+  if(runStartBeforeStepMove() != true)
+  {
+    return false;
+  }
+
+  setState(APP_SEQUENCE_STATE_MOVING_TO_END);
 
   if(taskStepMotorMoveToEnd(&cmd_id) != true)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+    setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
-  wait_result = appSequenceWaitStepMotor(cmd_id);
+  wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
-    if(appSequenceRunEndAction() != true)
+    if(runStartAfterStepMove() != true)
     {
       return false;
     }
 
-    appSequenceSetState(APP_SEQUENCE_STATE_READY_SEQUENCE);
+    setState(APP_SEQUENCE_STATE_READY_SEQUENCE);
     return true;
   }
 
   if(wait_result == APP_SEQUENCE_WAIT_RESET)
   {
-    return appSequenceHomeAll();
+    return runResetSequence();
   }
 
   if(wait_result == APP_SEQUENCE_WAIT_STOP)
   {
     (void)appEventClear(APP_EVT_STOP_REQ);
-    return appSequenceMoveToHome();
+    return runStopSequence();
   }
 
-  appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+  setState(APP_SEQUENCE_STATE_ERROR);
 
   return false;
 }
 
-static bool appSequenceRunEndAction(void)
+// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
+static bool runStartBeforeStepMove(void)
 {
-  appSequenceSetState(APP_SEQUENCE_STATE_END_ACTION);
+  setState(APP_SEQUENCE_STATE_START_ACTION);
 
-  if(appSequenceHandleResetOrStop() == true)
+  if(servoMoveAndWait(APP_SEQUENCE_SERVO_WORK_ANGLE_DEG) != true)
   {
     return false;
   }
 
-  if(taskValveOpen(APP_SEQUENCE_VALVE_CH) != true)
+  if(taskValveOpen(APP_SEQUENCE_VALVE1_CH) != true)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
+    setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
-  if(appSequenceHandleResetOrStop() == true)
+  if(handleResetStopRequest() == true)
   {
     return false;
   }
 
-  if(taskServoRun(APP_SEQUENCE_SERVO_CH, APP_SEQUENCE_SERVO_END_ANGLE_DEG) != true)
+  if(servoMoveAndWait(APP_SEQUENCE_SERVO_HOME_ANGLE_DEG) != true)
   {
-    appSequenceSetState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
   return true;
 }
 
-static bool appSequenceRunFootCycle(void)
+// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
+static bool runStartAfterStepMove(void)
+{
+  setState(APP_SEQUENCE_STATE_END_ACTION);
+
+  if(servoMoveAndWait(APP_SEQUENCE_SERVO_WORK_ANGLE_DEG) != true)
+  {
+    return false;
+  }
+
+  if(taskValveOpen(APP_SEQUENCE_VALVE2_CH) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(handleResetStopRequest() == true)
+  {
+    return false;
+  }
+
+  if(servoMoveAndWait(APP_SEQUENCE_SERVO_HOLD_ANGLE_DEG) != true)
+  {
+    return false;
+  }
+
+  return true;
+}
+
+// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
+static bool runFootSwitchSequence(void)
 {
   if(app_sequence_state != APP_SEQUENCE_STATE_READY_SEQUENCE)
   {
@@ -234,20 +313,40 @@ static bool appSequenceRunFootCycle(void)
     return false;
   }
 
-  appSequenceSetState(APP_SEQUENCE_STATE_RUNNING_SEQUENCE);
+  setState(APP_SEQUENCE_STATE_RUNNING_SEQUENCE);
 
-  /*
-   * FOOT sequence will be filled in after the detailed machine motion is fixed.
-   * Keep this function short and interruptible when adding servo, valve, and DC motor actions.
-   */
-  logPrintf("sequence foot \t\t: TODO\r\n");
+  if(runStopSequence() != true)
+  {
+    return false;
+  }
 
-  appSequenceSetState(APP_SEQUENCE_STATE_READY_SEQUENCE);
+  if(runStartSequence() != true)
+  {
+    return false;
+  }
 
   return true;
 }
 
-static void appSequenceStopAllActuators(void)
+// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
+static bool isStopSequenceAllowed(void)
+{
+  switch(app_sequence_state)
+  {
+    case APP_SEQUENCE_STATE_START_ACTION:
+    case APP_SEQUENCE_STATE_MOVING_TO_END:
+    case APP_SEQUENCE_STATE_END_ACTION:
+    case APP_SEQUENCE_STATE_READY_SEQUENCE:
+    case APP_SEQUENCE_STATE_RUNNING_SEQUENCE:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+// reset/home 시 모든 구동부를 안전한 기본 상태로 되돌린다.
+static void stopAllActuators(void)
 {
   (void)taskStepMotorStop(NULL);
 
@@ -273,7 +372,8 @@ static void appSequenceStopAllActuators(void)
 #endif
 }
 
-static bool appSequenceHandleResetOrStop(void)
+// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
+static bool handleResetStopRequest(void)
 {
   uint32_t evt;
 
@@ -281,21 +381,69 @@ static bool appSequenceHandleResetOrStop(void)
 
   if((evt & APP_EVT_RESET_REQ) != 0U)
   {
-    (void)appSequenceHomeAll();
+    (void)runResetSequence();
     return true;
   }
 
   if((evt & APP_EVT_STOP_REQ) != 0U)
   {
+    if(isStopSequenceAllowed() == true)
+    {
+      (void)appEventClear(APP_EVT_STOP_REQ);
+      (void)runStopSequence();
+      return true;
+    }
+
     (void)appEventClear(APP_EVT_STOP_REQ);
-    (void)appSequenceMoveToHome();
-    return true;
+    logPrintf("sequence stop \t\t: ignored\r\n");
   }
 
   return false;
 }
 
-static app_sequence_wait_t appSequenceWaitStepMotor(uint32_t cmd_id)
+// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
+static bool servoMoveAndWait(float angle_deg)
+{
+  if(handleResetStopRequest() == true)
+  {
+    return false;
+  }
+
+  if(taskServoRun(APP_SEQUENCE_SERVO_CH, angle_deg) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(delayInterruptible(APP_SEQUENCE_SERVO_WAIT_MS) != true)
+  {
+    return false;
+  }
+
+  return true;
+}
+
+// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
+static bool delayInterruptible(uint32_t delay_ms)
+{
+  while(delay_ms > 0U)
+  {
+    uint32_t wait_ms = (delay_ms > APP_SEQUENCE_ACK_WAIT_MS) ? APP_SEQUENCE_ACK_WAIT_MS : delay_ms;
+
+    if(handleResetStopRequest() == true)
+    {
+      return false;
+    }
+
+    osDelay(wait_ms);
+    delay_ms -= wait_ms;
+  }
+
+  return handleResetStopRequest() != true;
+}
+
+// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
+static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
 {
   while(1)
   {
@@ -311,7 +459,13 @@ static app_sequence_wait_t appSequenceWaitStepMotor(uint32_t cmd_id)
 
     if((evt & APP_EVT_STOP_REQ) != 0U)
     {
-      return APP_SEQUENCE_WAIT_STOP;
+      if(isStopSequenceAllowed() == true)
+      {
+        return APP_SEQUENCE_WAIT_STOP;
+      }
+
+      (void)appEventClear(APP_EVT_STOP_REQ);
+      logPrintf("sequence stop \t\t: ignored\r\n");
     }
 
     if(taskStepMotorGetAck(&ack, APP_SEQUENCE_ACK_WAIT_MS) != true)
@@ -339,7 +493,8 @@ static app_sequence_wait_t appSequenceWaitStepMotor(uint32_t cmd_id)
   }
 }
 
-static void appSequenceSetState(app_sequence_state_t state)
+// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
+static void setState(app_sequence_state_t state)
 {
   app_sequence_state = state;
   logPrintf("sequence state \t\t: %d\r\n", state);
