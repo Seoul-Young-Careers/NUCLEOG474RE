@@ -13,18 +13,18 @@
 #include "task/task_stepmotor.h"
 #include "task/task_valve.h"
 
-#define APP_SEQUENCE_CONTROL_EVT    (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS)
-#define APP_SEQUENCE_ACK_WAIT_MS    10U
+#define CONTROL_EVT                 (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS)
+#define ACK_WAIT_MS                 10U
 
-#define APP_SEQUENCE_SERVO_CH       _DEF_DS3120MG1
-#define APP_SEQUENCE_VALVE1_CH      _DEF_2V025_1
-#define APP_SEQUENCE_VALVE2_CH      _DEF_2V025_2
+#define SERVO_CH                    _DEF_DS3120MG1
+#define VALVE1_CH                   _DEF_2V025_1
+#define VALVE2_CH                   _DEF_2V025_2
 
-#define APP_SEQUENCE_SERVO_HOME_ANGLE_DEG 0.0f
-#define APP_SEQUENCE_SERVO_WORK_ANGLE_DEG 150.0f
-#define APP_SEQUENCE_SERVO_HOLD_ANGLE_DEG 120.0f
+#define SERVO_HOME_ANGLE_DEG        0.0f
+#define SERVO_WORK_ANGLE_DEG        150.0f
+#define SERVO_HOLD_ANGLE_DEG        120.0f
 
-#define APP_SEQUENCE_SERVO_WAIT_MS  500U
+#define SERVO_WAIT_MS               500U
 
 typedef enum
 {
@@ -53,7 +53,6 @@ static bool isStopSequenceAllowed(void);
 
 // reset/home 시 모든 구동부를 안전한 기본 상태로 되돌린다.
 static void stopAllActuators(void);
-
 // 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
 static bool handleResetStopRequest(void);
 // 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
@@ -77,7 +76,7 @@ void sequenceProcess(void)
 {
   uint32_t evt;
 
-  evt = appEventWait(APP_SEQUENCE_CONTROL_EVT,
+  evt = appEventWait(CONTROL_EVT,
                      osFlagsWaitAny | osFlagsNoClear,
                      osWaitForever);
 
@@ -89,7 +88,7 @@ void sequenceProcess(void)
 
   if((evt & APP_EVT_RESET_REQ) != 0U)
   {
-    (void)appEventClear(APP_SEQUENCE_CONTROL_EVT);
+    (void)appEventClear(CONTROL_EVT);
     (void)runResetSequence();
     return;
   }
@@ -138,7 +137,7 @@ static bool runResetSequence(void)
 
   setState(APP_SEQUENCE_STATE_HOMING);
 
-  (void)appEventClear(APP_SEQUENCE_CONTROL_EVT);
+  (void)appEventClear(CONTROL_EVT);
   stopAllActuators();
 
   if(taskStepMotorMoveToHome(&cmd_id) != true)
@@ -172,8 +171,8 @@ static bool runStopSequence(void)
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
 
-  (void)taskValveClose(APP_SEQUENCE_VALVE1_CH);
-  (void)taskValveClose(APP_SEQUENCE_VALVE2_CH);
+  (void)taskValveClose(VALVE1_CH);
+  (void)taskValveClose(VALVE2_CH);
 
   if(taskStepMotorMoveToHome(&cmd_id) != true)
   {
@@ -251,12 +250,12 @@ static bool runStartBeforeStepMove(void)
 {
   setState(APP_SEQUENCE_STATE_START_ACTION);
 
-  if(servoMoveAndWait(APP_SEQUENCE_SERVO_WORK_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_WORK_ANGLE_DEG) != true)
   {
     return false;
   }
 
-  if(taskValveOpen(APP_SEQUENCE_VALVE1_CH) != true)
+  if(taskValveOpen(VALVE1_CH) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;
@@ -267,7 +266,7 @@ static bool runStartBeforeStepMove(void)
     return false;
   }
 
-  if(servoMoveAndWait(APP_SEQUENCE_SERVO_HOME_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_HOME_ANGLE_DEG) != true)
   {
     return false;
   }
@@ -280,12 +279,12 @@ static bool runStartAfterStepMove(void)
 {
   setState(APP_SEQUENCE_STATE_END_ACTION);
 
-  if(servoMoveAndWait(APP_SEQUENCE_SERVO_WORK_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_WORK_ANGLE_DEG) != true)
   {
     return false;
   }
 
-  if(taskValveOpen(APP_SEQUENCE_VALVE2_CH) != true)
+  if(taskValveOpen(VALVE2_CH) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;
@@ -296,7 +295,7 @@ static bool runStartAfterStepMove(void)
     return false;
   }
 
-  if(servoMoveAndWait(APP_SEQUENCE_SERVO_HOLD_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_HOLD_ANGLE_DEG) != true)
   {
     return false;
   }
@@ -360,7 +359,7 @@ static void stopAllActuators(void)
 #ifdef _USE_DS3120MG
   for(uint8_t i = 0; i < DS3120MG_MAX_CH; i++)
   {
-    (void)taskServoRun(i, APP_SEQUENCE_SERVO_HOME_ANGLE_DEG);
+    (void)taskServoRun(i, SERVO_HOME_ANGLE_DEG);
   }
 #endif
 
@@ -409,13 +408,13 @@ static bool servoMoveAndWait(float angle_deg)
     return false;
   }
 
-  if(taskServoRun(APP_SEQUENCE_SERVO_CH, angle_deg) != true)
+  if(taskServoRun(SERVO_CH, angle_deg) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
-  if(delayInterruptible(APP_SEQUENCE_SERVO_WAIT_MS) != true)
+  if(delayInterruptible(SERVO_WAIT_MS) != true)
   {
     return false;
   }
@@ -428,7 +427,7 @@ static bool delayInterruptible(uint32_t delay_ms)
 {
   while(delay_ms > 0U)
   {
-    uint32_t wait_ms = (delay_ms > APP_SEQUENCE_ACK_WAIT_MS) ? APP_SEQUENCE_ACK_WAIT_MS : delay_ms;
+    uint32_t wait_ms = (delay_ms > ACK_WAIT_MS) ? ACK_WAIT_MS : delay_ms;
 
     if(handleResetStopRequest() == true)
     {
@@ -468,7 +467,7 @@ static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
       logPrintf("sequence stop \t\t: ignored\r\n");
     }
 
-    if(taskStepMotorGetAck(&ack, APP_SEQUENCE_ACK_WAIT_MS) != true)
+    if(taskStepMotorGetAck(&ack, ACK_WAIT_MS) != true)
     {
       continue;
     }

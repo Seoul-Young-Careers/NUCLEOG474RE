@@ -8,7 +8,6 @@
 #include "task/task_stepmotor.h"
 #include "task/app_event.h"
 
-#define STEP_MOTOR_RUN_CH              _DEF_DM542_1
 #define STEP_MOTOR_IDLE_MS             1U
 #define STEP_MOTOR_PULSE_DELAY_US      1000U
 #define STEP_MOTOR_TRAVEL_MAX_STEPS    100000
@@ -88,7 +87,7 @@ bool taskStepMotorMoveToHome(uint32_t *p_cmd_id)
   rtos_step_motor_msg_t msg;
 
   msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME;
-  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.ch             = _DEF_DM542_1;
   msg.step           = STEP_MOTOR_HOME_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
   msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
 
@@ -100,7 +99,7 @@ bool taskStepMotorMoveToEnd(uint32_t *p_cmd_id)
   rtos_step_motor_msg_t msg;
 
   msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_END;
-  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.ch             = _DEF_DM542_1;
   msg.step           = STEP_MOTOR_END_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
   msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
 
@@ -112,7 +111,7 @@ bool taskStepMotorStop(uint32_t *p_cmd_id)
   rtos_step_motor_msg_t msg;
 
   msg.cmd            = RTOS_STEP_MOTOR_CMD_STOP;
-  msg.ch             = STEP_MOTOR_RUN_CH;
+  msg.ch             = _DEF_DM542_1;
   msg.step           = 0;
   msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
 
@@ -173,7 +172,7 @@ static void threadStepMotor(void *argument)
   rtos_step_motor_msg_t msg;
   rtos_step_motor_msg_t active_msg = {0};
   bool has_active_msg = false;
-  uint8_t move_ch = STEP_MOTOR_RUN_CH;
+  uint8_t move_ch = _DEF_DM542_1;
   int32_t move_remain_step = 0;
   uint32_t move_pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
   uint32_t target_evt = 0U;
