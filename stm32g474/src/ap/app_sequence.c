@@ -110,15 +110,31 @@ void sequenceProcess(void)
 
   if((evt & APP_EVT_START_REQ) != 0U)
   {
-    (void)appEventClear(APP_EVT_START_REQ);
-    (void)runStartSequence();
+    if(app_sequence_state == APP_SEQUENCE_STATE_IDLE_HOME)
+    {
+      (void)appEventClear(APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
+      (void)runStartSequence();
+    }
+    else
+    {
+      (void)appEventClear(APP_EVT_START_REQ);
+      logPrintf("sequence start \t\t: ignored\r\n");
+    }
     return;
   }
 
   if((evt & APP_EVT_FOOT_PRESS) != 0U)
   {
-    (void)appEventClear(APP_EVT_FOOT_PRESS);
-    (void)runFootSwitchSequence();
+    if(app_sequence_state == APP_SEQUENCE_STATE_READY_SEQUENCE)
+    {
+      (void)appEventClear(APP_EVT_FOOT_PRESS | APP_EVT_START_REQ);
+      (void)runFootSwitchSequence();
+    }
+    else
+    {
+      (void)appEventClear(APP_EVT_FOOT_PRESS);
+      logPrintf("sequence foot \t\t: ignored\r\n");
+    }
     return;
   }
 }
@@ -149,6 +165,7 @@ static bool runResetSequence(void)
   wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
+    (void)appEventClear(CONTROL_EVT);
     setState(APP_SEQUENCE_STATE_IDLE_HOME);
     return true;
   }
@@ -183,6 +200,7 @@ static bool runStopSequence(void)
   wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
+    (void)appEventClear(APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
     setState(APP_SEQUENCE_STATE_IDLE_HOME);
     return true;
   }
@@ -225,6 +243,7 @@ static bool runStartSequence(void)
       return false;
     }
 
+    (void)appEventClear(APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
     setState(APP_SEQUENCE_STATE_READY_SEQUENCE);
     return true;
   }
@@ -323,6 +342,8 @@ static bool runFootSwitchSequence(void)
   {
     return false;
   }
+
+  (void)appEventClear(APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
 
   return true;
 }

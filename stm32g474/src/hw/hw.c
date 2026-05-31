@@ -27,4 +27,5 @@ void hwInit(void)
   ds3120mgInit();
   sn04Init();
   v025Init();
+  pumpInit();
 }

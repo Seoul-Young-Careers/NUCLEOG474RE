@@ -23,6 +23,7 @@
 #include "loadcell/hx711.h"
 #include "sensor/sn04.h"
 #include "valve/2v025.h"
+#include "pump/pump.h"
 
 void hwInit(void);
 

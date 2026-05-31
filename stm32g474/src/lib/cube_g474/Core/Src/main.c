@@ -94,9 +94,7 @@ int main(void)
   MX_DMA_Init();
   MX_TIM3_Init();
   MX_TIM2_Init();
-  MX_TIM4_Init();
   MX_USART2_UART_Init();
-  MX_TIM5_Init();
   MX_TIM15_Init();
   /* USER CODE BEGIN 2 */
 

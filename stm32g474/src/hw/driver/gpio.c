@@ -23,8 +23,6 @@ typedef struct
 button_tbl_t gpio_tbl[GPIO_MAX_CH] =
 {
 	{GPIOA, GPIO_PIN_7, _DEF_OUTPUT_OPENDRAIN , GPIO_PIN_SET, GPIO_PIN_RESET, _DEF_LOW},  		  // 0. DM542_DIR
-
-
 };
 
 #ifdef _USE_HW_CLI

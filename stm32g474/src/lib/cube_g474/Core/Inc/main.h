@@ -69,8 +69,6 @@ void Error_Handler(void);
 #define BUTTON_STOP_GPIO_Port GPIOC
 #define BUTTON_RESET_Pin GPIO_PIN_5
 #define BUTTON_RESET_GPIO_Port GPIOC
-#define bts7960_1_Pin GPIO_PIN_2
-#define bts7960_1_GPIO_Port GPIOB
 #define SN04_2_Pin GPIO_PIN_10
 #define SN04_2_GPIO_Port GPIOB
 #define bts7960_2_Pin GPIO_PIN_14
@@ -85,8 +83,8 @@ void Error_Handler(void);
 #define BUTTON_START_GPIO_Port GPIOA
 #define BUTTON_FOOT_Pin GPIO_PIN_3
 #define BUTTON_FOOT_GPIO_Port GPIOB
-#define DS3120MG_2_Pin GPIO_PIN_6
-#define DS3120MG_2_GPIO_Port GPIOB
+#define Pump_Pin GPIO_PIN_6
+#define Pump_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

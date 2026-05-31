@@ -15,9 +15,6 @@
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim4;
-TIM_HandleTypeDef htim5;
-TIM_HandleTypeDef htim15;
 
 #define od 			GPIO_MODE_AF_OD
 #define pp			GPIO_MODE_AF_PP
@@ -60,42 +57,12 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
     .is_count_mode  = false,
     .remain_count   = 0,
   },
-  {
-    .p_tim          = &htim4,
-    .channel        = TIM_CHANNEL_1,
-
-    .is_open        = false,
-    .is_busy        = false,
-    .is_count_mode  = false,
-    .remain_count   = 0,
-  },
-  {
-    .p_tim          = &htim5,
-    .channel        = TIM_CHANNEL_1,
-
-    .is_open        = false,
-    .is_busy        = false,
-    .is_count_mode  = false,
-    .remain_count   = 0,
-  },
-  {
-    .p_tim          = &htim15,
-    .channel        = TIM_CHANNEL_1,
-
-    .is_open        = false,
-    .is_busy        = false,
-    .is_count_mode  = false,
-    .remain_count   = 0,
-  },
 };
 
 static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 {
 	{ 169, 3332, 1500 },									// sub motor
   { 79, 999, 5 },												// step motor
-	{ 169, 3332, 1500 },									// sub motor
-	{ 79, 999, 5 },												// motor driver
-	{ 79, 999, 5 },												// motor driver
 };
 
 #ifdef _USE_HW_CLI
@@ -168,7 +135,7 @@ bool pwmOpen(uint8_t ch)
       return false;
     }
 
-    pwmSetGpioMode(ch, od);
+    pwmSetGpioMode(ch, pp);
 
   pwm_tbl[ch].is_open = true;
   break;

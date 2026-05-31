@@ -43,7 +43,7 @@
 //#define 	HW_HX711_MAX							1
 
 #define _USE_PWM
-#define 	HW_PWM_MAX_CH							5
+#define 	HW_PWM_MAX_CH							2
 
 #define _USE_DM542
 #define		HW_DM542_MAX							1
@@ -52,13 +52,15 @@
 //#define		HW_BTS7960_MAX_CH					1
 
 #define _USE_DS3120MG
-#define		HW_DS3120MG_MAX						2
+#define		HW_DS3120MG_MAX						1
 
 #define _USE_SN04
 #define		HW_SN04_MAX_CH						2
 
 #define _USE_2V025
 #define		HW_2V025_MAX_CH						2
+
+#define _USE_PUMP
 
 
 #endif /* SRC_HW_HW_DEF_H_ */

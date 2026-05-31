@@ -1,8 +1,12 @@
-/*
- * ap.c
- *
- *  Created on: Dec 6, 2020
- *      Author: baram
+/**
+ * @file ap.c
+ * @author Cho Yongjune (cho0040@naver.com)
+ * @brief 
+ * @version 0.1
+ * @date 2026-05-31
+ * 
+ * @copyright Copyright (c) 2026
+ * 
  */
 
 #include "ap.h"

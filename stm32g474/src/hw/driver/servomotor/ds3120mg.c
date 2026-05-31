@@ -383,10 +383,6 @@ static bool ds3120mgGetPwmCh(uint8_t ch, uint8_t *p_pwm_ch)
   switch(ch)
   {
     case _DEF_DS3120MG1:
-      *p_pwm_ch = _DEF_PWM3;
-      break;
-
-    case _DEF_DS3120MG2:
       *p_pwm_ch = _DEF_PWM1;
       break;
 
