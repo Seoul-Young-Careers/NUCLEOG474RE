@@ -29,6 +29,9 @@
 
 #define SERVO_WAIT_MS               500U
 
+#define STEP_MOTOR_READY_OFFSET_STEPS     200
+#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US 1000U
+
 typedef enum
 {
   APP_SEQUENCE_WAIT_DONE = 0,
@@ -42,9 +45,9 @@ static app_sequence_state_t app_sequence_state = APP_SEQUENCE_STATE_BOOT;
 /*
 
  */
-static bool runResetSequence(void);															// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
+static bool runResetSequence(void);															// RESET 버튼 또는 전원 초기화 시 HOME 기준을 잡고 시작 위치로 이동시킨다.
 
-static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
+static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 때 스텝모터를 시작 위치로 이동시킨다.
 
 static bool runStartSequence(void);															// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
 static bool runStartBeforeStepMove(void);												// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
@@ -59,10 +62,11 @@ static bool servoMoveAndWait(float angle_deg);									// 서보를 지정 각�
 
 static bool delayInterruptible(uint32_t delay_ms);							// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
 
+static app_sequence_wait_t moveStepMotorToReadyPosition(void); // SN04_1 감지 후 SN04_2 방향으로 지정 스텝만큼 이동한다.
 static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);			// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
 static void setState(app_sequence_state_t state);								// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
 
-// 장비 시퀀스를 시작할 때 전체 구동부를 초기 상태로 복귀한다.
+// 장비 시퀀스를 시작할 때 구동부를 초기 위치로 보정한다.
 bool sequenceInit(void)
 {
   return runResetSequence();
@@ -142,46 +146,38 @@ app_sequence_state_t sequenceGetState(void)
   return app_sequence_state;
 }
 
-// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
+// RESET 버튼 또는 전원 초기화 시 HOME 기준을 잡고 시작 위치로 이동시킨다.
 static bool runResetSequence(void)
 {
   app_sequence_wait_t wait_result;
-  uint32_t cmd_id;
 
   setState(APP_SEQUENCE_STATE_HOMING);
 
   (void)appEventClear(CONTROL_EVT);
   stopAllActuators();
 
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-  if(wait_result == APP_SEQUENCE_WAIT_DONE)
-  {
-    (void)appEventClear(CONTROL_EVT);
-    setState(APP_SEQUENCE_STATE_IDLE_HOME);
-    return true;
-  }
-
+  wait_result = moveStepMotorToReadyPosition();
   if(wait_result == APP_SEQUENCE_WAIT_RESET)
   {
     return runResetSequence();
   }
 
-  setState(APP_SEQUENCE_STATE_ERROR);
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
 
-  return false;
+  (void)appEventClear(CONTROL_EVT);
+  setState(APP_SEQUENCE_STATE_IDLE_HOME);
+
+  return true;
 }
 
-// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
+// STOP 버튼을 눌렀을 때 스텝모터를 시작 위치로 이동시킨다.
 static bool runStopSequence(void)
 {
   app_sequence_wait_t wait_result;
-  uint32_t cmd_id;
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
 
@@ -189,13 +185,7 @@ static bool runStopSequence(void)
   (void)taskValveClose(VALVE1_CH);
   (void)taskValveClose(VALVE2_CH);
 
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
+  wait_result = moveStepMotorToReadyPosition();
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
     (void)appEventClear(APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
@@ -465,6 +455,34 @@ static bool delayInterruptible(uint32_t delay_ms)
   }
 
   return handleResetStopRequest() != true;
+}
+
+// SN04_1 감지 후 SN04_2 방향으로 지정 스텝만큼 이동한다.
+static app_sequence_wait_t moveStepMotorToReadyPosition(void)
+{
+  app_sequence_wait_t wait_result;
+  uint32_t cmd_id;
+
+  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  {
+    return APP_SEQUENCE_WAIT_ERROR;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    return wait_result;
+  }
+
+  if(taskStepMotorMoveStep(_DEF_DM542_1,
+                           STEP_MOTOR_READY_OFFSET_STEPS,
+                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
+                           &cmd_id) != true)
+  {
+    return APP_SEQUENCE_WAIT_ERROR;
+  }
+
+  return waitStepMotor(cmd_id);
 }
 
 // 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.

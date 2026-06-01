@@ -10,7 +10,7 @@
 
 #define STEP_MOTOR_IDLE_MS             1U
 #define STEP_MOTOR_PULSE_DELAY_US      1000U
-#define STEP_MOTOR_TRAVEL_MAX_STEPS    1
+#define STEP_MOTOR_TRAVEL_MAX_STEPS    20000
 
 #define STEP_MOTOR_HOME_DIR            (-1)
 #define STEP_MOTOR_END_DIR             1
