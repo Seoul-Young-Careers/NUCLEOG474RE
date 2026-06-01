@@ -493,6 +493,8 @@ static void cliDm542(cli_args_t *args)
   bool cmd_ret;
   uint8_t ch;
   uint32_t value;
+  int32_t step;
+  uint32_t delay_us;
 
   if(args->argc == 1)
   {
@@ -541,6 +543,28 @@ static void cliDm542(cli_args_t *args)
       cliPrintf("dm542 stop %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
       ret = true;
     }
+
+    if(args->isStr(0, "read") == true)
+    {
+      dm542_data_t data;
+
+      cmd_ret = dm542ReadData(ch, &data);
+      if(cmd_ret == true)
+      {
+        cliPrintf("dm542 read %d open:%d busy:%d pos:%ld remain:%lu\n",
+                  ch,
+                  data.is_open,
+                  data.is_busy,
+                  (long)data.position_step,
+                  data.remain_step);
+      }
+      else
+      {
+        cliPrintf("dm542 read %d : FAIL\n", ch);
+      }
+
+      ret = true;
+    }
   }
 
   if(args->argc == 3)
@@ -554,15 +578,69 @@ static void cliDm542(cli_args_t *args)
       cliPrintf("dm542 freq %d %luhz : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
       ret = true;
     }
+
+    if(args->isStr(0, "prescaler") == true)
+    {
+      cmd_ret = dm542SetPrescaler(ch, value);
+      cliPrintf("dm542 prescaler %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "period") == true)
+    {
+      cmd_ret = dm542SetPeriod(ch, value);
+      cliPrintf("dm542 period %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "pulse") == true)
+    {
+      cmd_ret = dm542SetPulse(ch, value);
+      cliPrintf("dm542 pulse %d %lu : %s\n", ch, value, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+  }
+
+  if(args->argc == 4)
+  {
+    ch       = (uint8_t)args->getData(1);
+    step     = args->getData(2);
+    delay_us = (uint32_t)args->getData(3);
+
+    if(args->isStr(0, "move") == true)
+    {
+      cmd_ret = dm542MoveStep(ch, step, delay_us);
+      cliPrintf("dm542 move %d %ld %luus : %s\n",
+                ch,
+                (long)step,
+                delay_us,
+                cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
+
+    if(args->isStr(0, "mm") == true)
+    {
+      float mm = args->getFloat(2);
+
+      cmd_ret = dm542MoveMm(ch, mm, delay_us);
+      cliPrintf("dm542 mm %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      ret = true;
+    }
   }
 
   if(ret != true)
   {
     cliPrintf("dm542 show\n");
     cliPrintf("dm542 open ch[0~%d]\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 read ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 start ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 stop ch[0~%d]\n", DM542_MAX_CH - 1);
     cliPrintf("dm542 freq ch[0~%d] hz\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 prescaler ch[0~%d] value\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 period ch[0~%d] value\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 pulse ch[0~%d] value\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 move ch[0~%d] step delay_us\n", DM542_MAX_CH - 1);
+    cliPrintf("dm542 mm ch[0~%d] mm delay_us\n", DM542_MAX_CH - 1);
   }
 }
 #endif

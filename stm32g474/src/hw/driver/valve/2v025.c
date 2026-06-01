@@ -252,7 +252,7 @@ static void cliV025(cli_args_t *args)
     {
       for(uint8_t i = 0; i < V025_MAX_CH; i++)
       {
-        cliPrintf("valve %d ready:%d open:%d\n",
+        cliPrintf("v025 %d ready:%d open:%d\n",
                   i,
                   v025IsReady(i),
                   v025ValveIsOpen(i));
@@ -265,24 +265,24 @@ static void cliV025(cli_args_t *args)
   {
     ch = (uint8_t)args->getData(1);
 
-    if(args->isStr(0, "open") == true)
+    if((args->isStr(0, "open") == true) || (args->isStr(0, "on") == true))
     {
       cmd_ret = v025ValveOpen(ch);
-      cliPrintf("valve open %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      cliPrintf("v025 open %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
       ret = true;
     }
 
-    if(args->isStr(0, "close") == true)
+    if((args->isStr(0, "close") == true) || (args->isStr(0, "off") == true))
     {
       cmd_ret = v025ValveClose(ch);
-      cliPrintf("valve close %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
+      cliPrintf("v025 close %d : %s\n", ch, cmd_ret ? "OK" : "FAIL");
       ret = true;
     }
 
     if(args->isStr(0, "toggle") == true)
     {
       cmd_ret = v025ValveToggle(ch);
-      cliPrintf("valve toggle %d : %s (open:%d)\n",
+      cliPrintf("v025 toggle %d : %s (open:%d)\n",
                 ch,
                 cmd_ret ? "OK" : "FAIL",
                 v025ValveIsOpen(ch));
@@ -291,7 +291,21 @@ static void cliV025(cli_args_t *args)
 
     if(args->isStr(0, "read") == true)
     {
-      cliPrintf("valve read %d : open:%d\n", ch, v025ValveIsOpen(ch));
+      v025_data_t data;
+
+      cmd_ret = v025ReadData(ch, &data);
+      if(cmd_ret == true)
+      {
+        cliPrintf("v025 read %d ready:%d open:%d\n",
+                  ch,
+                  data.is_ready,
+                  data.is_open);
+      }
+      else
+      {
+        cliPrintf("v025 read %d : FAIL\n", ch);
+      }
+
       ret = true;
     }
   }
@@ -305,7 +319,7 @@ static void cliV025(cli_args_t *args)
       bool open_val = (args->getData(2) != 0);
 
       cmd_ret = v025ValveSet(ch, open_val);
-      cliPrintf("valve set %d %d : %s\n",
+      cliPrintf("v025 set %d %d : %s\n",
                 ch,
                 open_val ? 1 : 0,
                 cmd_ret ? "OK" : "FAIL");
@@ -315,12 +329,14 @@ static void cliV025(cli_args_t *args)
 
   if(ret != true)
   {
-    cliPrintf("valve show\n");
-    cliPrintf("valve open   ch[0~%d]\n", V025_MAX_CH - 1);
-    cliPrintf("valve close  ch[0~%d]\n", V025_MAX_CH - 1);
-    cliPrintf("valve toggle ch[0~%d]\n", V025_MAX_CH - 1);
-    cliPrintf("valve read   ch[0~%d]\n", V025_MAX_CH - 1);
-    cliPrintf("valve set    ch[0~%d] 0:1\n", V025_MAX_CH - 1);
+    cliPrintf("v025 show\n");
+    cliPrintf("v025 open   ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 close  ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 on     ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 off    ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 toggle ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 read   ch[0~%d]\n", V025_MAX_CH - 1);
+    cliPrintf("v025 set    ch[0~%d] 0:1\n", V025_MAX_CH - 1);
   }
 }
 #endif

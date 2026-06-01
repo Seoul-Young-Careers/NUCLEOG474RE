@@ -9,6 +9,7 @@
 
 #include "task/app_event.h"
 #include "task/task_dcmotor.h"
+#include "task/task_pump.h"
 #include "task/task_servo.h"
 #include "task/task_stepmotor.h"
 #include "task/task_valve.h"
@@ -20,9 +21,11 @@
 #define VALVE1_CH                   _DEF_2V025_1
 #define VALVE2_CH                   _DEF_2V025_2
 
-#define SERVO_HOME_ANGLE_DEG        0.0f
-#define SERVO_WORK_ANGLE_DEG        150.0f
-#define SERVO_HOLD_ANGLE_DEG        120.0f
+#define SERVO_HOME_ANGLE_DEG        			170.0f
+#define SERVO_START_GRAB_BAG_ANGLE_DEG		70.0f
+#define SERVO_START_PUT_BAG_ANGLE_DEG     70.0f
+#define SERVO_START_OPEN_BAG_ANGLE_DEG		80.0f
+#define SERVO_HOLD_ANGLE_DEG        			120.0f
 
 #define SERVO_WAIT_MS               500U
 
@@ -36,34 +39,28 @@ typedef enum
 
 static app_sequence_state_t app_sequence_state = APP_SEQUENCE_STATE_BOOT;
 
-// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
-static bool runResetSequence(void);
-// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
-static bool runStopSequence(void);
-// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
-static bool runStartSequence(void);
-// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
-static bool runStartBeforeStepMove(void);
-// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
-static bool runStartAfterStepMove(void);
-// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
-static bool runFootSwitchSequence(void);
-// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
-static bool isStopSequenceAllowed(void);
+/*
 
-// reset/home 시 모든 구동부를 안전한 기본 상태로 되돌린다.
-static void stopAllActuators(void);
-// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
-static bool handleResetStopRequest(void);
-// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
-static bool servoMoveAndWait(float angle_deg);
-// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
-static bool delayInterruptible(uint32_t delay_ms);
-// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
-static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);
+ */
+static bool runResetSequence(void);															// RESET 버튼 또는 전원 초기화 시 전체 구동부를 원점 상태로 복귀시킨다.
 
-// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
-static void setState(app_sequence_state_t state);
+static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 때 스텝모터를 HOME 센서 방향으로 이동시킨다.
+
+static bool runStartSequence(void);															// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
+static bool runStartBeforeStepMove(void);												// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
+static bool runStartAfterStepMove(void);												// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
+
+static bool runFootSwitchSequence(void);												// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
+
+static bool isStopSequenceAllowed(void);												// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
+static void stopAllActuators(void);															// reset시 모든 구동부를 안전한 기본 상태로 되돌린다.
+static bool handleResetStopRequest(void);												// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
+static bool servoMoveAndWait(float angle_deg);									// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
+
+static bool delayInterruptible(uint32_t delay_ms);							// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
+
+static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);			// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
+static void setState(app_sequence_state_t state);								// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
 
 // 장비 시퀀스를 시작할 때 전체 구동부를 초기 상태로 복귀한다.
 bool sequenceInit(void)
@@ -188,6 +185,7 @@ static bool runStopSequence(void)
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
 
+  (void)taskPumpOff();
   (void)taskValveClose(VALVE1_CH);
   (void)taskValveClose(VALVE2_CH);
 
@@ -269,8 +267,14 @@ static bool runStartBeforeStepMove(void)
 {
   setState(APP_SEQUENCE_STATE_START_ACTION);
 
-  if(servoMoveAndWait(SERVO_WORK_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_START_GRAB_BAG_ANGLE_DEG) != true)
   {
+    return false;
+  }
+
+  if(taskPumpOn() != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
@@ -298,7 +302,7 @@ static bool runStartAfterStepMove(void)
 {
   setState(APP_SEQUENCE_STATE_END_ACTION);
 
-  if(servoMoveAndWait(SERVO_WORK_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_START_PUT_BAG_ANGLE_DEG) != true)
   {
     return false;
   }
@@ -314,7 +318,7 @@ static bool runStartAfterStepMove(void)
     return false;
   }
 
-  if(servoMoveAndWait(SERVO_HOLD_ANGLE_DEG) != true)
+  if(servoMoveAndWait(SERVO_START_OPEN_BAG_ANGLE_DEG) != true)
   {
     return false;
   }
@@ -369,6 +373,7 @@ static bool isStopSequenceAllowed(void)
 static void stopAllActuators(void)
 {
   (void)taskStepMotorStop(NULL);
+  (void)taskPumpOff();
 
 #ifdef _USE_BTS7960
   for(uint8_t i = 0; i < BTS7960_MAX_CH; i++)

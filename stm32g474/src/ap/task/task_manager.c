@@ -11,6 +11,7 @@
 #include "task/task_button.h"
 #include "task/task_dcmotor.h"
 #include "task/task_led.h"
+#include "task/task_pump.h"
 #include "task/task_sensor.h"
 #include "task/task_sequence.h"
 #include "task/task_servo.h"
@@ -36,6 +37,10 @@ bool taskManagerInit(void)
 
 #ifdef _USE_2V025
   if(taskManagerCheck("taskValve", taskValveInit()) != true) return false;
+#endif
+
+#ifdef _USE_PUMP
+  if(taskManagerCheck("taskPump", taskPumpInit()) != true) return false;
 #endif
 
 #ifdef _USE_DM542

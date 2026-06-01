@@ -74,9 +74,9 @@ bool ds3120mgInit(void)
     ds3120mg_tbl[i].min_pulse_us  = DS3120MG_MIN_PULSE_US;
     ds3120mg_tbl[i].mid_pulse_us  = DS3120MG_MID_PULSE_US;
     ds3120mg_tbl[i].max_pulse_us  = DS3120MG_MAX_PULSE_US;
-    ds3120mg_tbl[i].pulse_us      = DS3120MG_MID_PULSE_US;
     ds3120mg_tbl[i].angle_deg     = DS3120MG_ANGLE_DEG;
     ds3120mg_tbl[i].max_angle_deg = DS3120MG_MAX_ANGLE_DEG;
+    ds3120mg_tbl[i].pulse_us      = ds3120mgAngleToPulse(i, ds3120mg_tbl[i].angle_deg);
 
     if(ds3120mgOpen(i) != true)
     {
