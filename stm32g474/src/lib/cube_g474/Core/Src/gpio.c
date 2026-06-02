@@ -74,7 +74,7 @@ void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : BUTTON_STOP_Pin */
   GPIO_InitStruct.Pin = BUTTON_STOP_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BUTTON_STOP_GPIO_Port, &GPIO_InitStruct);
 
@@ -84,8 +84,14 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BUTTON_RESET_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SN04_2_Pin BUTTON_FOOT_Pin */
-  GPIO_InitStruct.Pin = SN04_2_Pin|BUTTON_FOOT_Pin;
+  /*Configure GPIO pins : SN04_1_Pin SN04_2_Pin */
+  GPIO_InitStruct.Pin = SN04_1_Pin|SN04_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BUTTON_FOOT_Pin */
+  GPIO_InitStruct.Pin = BUTTON_FOOT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -97,11 +103,11 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(VALVE_2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SN04_1_Pin BUTTON_START_Pin */
-  GPIO_InitStruct.Pin = SN04_1_Pin|BUTTON_START_Pin;
+  /*Configure GPIO pin : BUTTON_START_Pin */
+  GPIO_InitStruct.Pin = BUTTON_START_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(BUTTON_START_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Pump_Pin */
   GPIO_InitStruct.Pin = Pump_Pin;
@@ -109,6 +115,13 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Pump_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 

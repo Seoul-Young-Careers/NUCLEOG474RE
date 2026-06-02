@@ -15,7 +15,7 @@ static void cliPump(cli_args_t *args);
 #endif
 
 #define PUMP_PORT              GPIOB
-#define PUMP_PIN               GPIO_PIN_5
+#define PUMP_PIN               GPIO_PIN_6
 #define PUMP_ON_STATE          GPIO_PIN_SET
 #define PUMP_OFF_STATE         GPIO_PIN_RESET
 

@@ -36,14 +36,14 @@ typedef struct
 
 static const sn04_pin_t sn04_pin_tbl[SN04_MAX_CH] =
 {
-  {GPIOA, GPIO_PIN_8},
-  {GPIOB, GPIO_PIN_10},
+  {GPIOB, GPIO_PIN_10},  /* SN04_1 */
+  {GPIOB, GPIO_PIN_4},   /* SN04_2 */
 };
 
 static const IRQn_Type sn04_irq_tbl[SN04_MAX_CH] =
 {
-  EXTI9_5_IRQn,    /* PA8  -> EXTI line 8  */
-  EXTI15_10_IRQn,  /* PB10 -> EXTI line 10 */
+  EXTI15_10_IRQn,  /* SN04_1: PB10 -> EXTI line 10 */
+  EXTI4_IRQn,      /* SN04_2: PB4  -> EXTI line 4  */
 };
 
 #define SN04_EXTI_IRQ_PRIO   5U
@@ -182,12 +182,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 /*
  * EXTI IRQ 핸들러를 sn04 드라이버 안에서 직접 override.
  * (startup_stm32g474retx.s 의 weak symbol을 덮어씀)
- *   PA8  -> EXTI line 8  -> EXTI9_5_IRQHandler
  *   PB10 -> EXTI line 10 -> EXTI15_10_IRQHandler
+ *   PB4  -> EXTI line 4  -> EXTI4_IRQHandler
  */
-void EXTI9_5_IRQHandler(void)
+void EXTI4_IRQHandler(void)
 {
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
 }
 
 void EXTI15_10_IRQHandler(void)

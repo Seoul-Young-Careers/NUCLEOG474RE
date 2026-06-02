@@ -15,7 +15,8 @@
 #define STEP_MOTOR_HOME_DIR            (-1)
 #define STEP_MOTOR_END_DIR             1
 
-#define STEP_MOTOR_CONTROL_EVT         APP_EVT_RESET_REQ
+#define STEP_MOTOR_HOME_SENSOR_EVT     APP_EVT_SN04_1_DETECTED
+#define STEP_MOTOR_END_SENSOR_EVT      APP_EVT_SN04_2_DETECTED
 
 static osMessageQueueId_t step_motor_msg_q = NULL;
 static osMessageQueueId_t step_motor_ack_q = NULL;
@@ -182,26 +183,6 @@ static void threadStepMotor(void *argument)
 
   while(1)
   {
-    uint32_t evt_flags;
-
-    evt_flags = appEventGet();
-    if((evt_flags & STEP_MOTOR_CONTROL_EVT) != 0U)
-    {
-      move_remain_step = 0;
-      target_evt = 0U;
-      is_target_move = false;
-      taskStepMotorStopCurrent(move_ch);
-
-      if(has_active_msg == true)
-      {
-        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_STOPPED);
-        has_active_msg = false;
-      }
-
-      osDelay(STEP_MOTOR_IDLE_MS);
-      continue;
-    }
-
     if(osMessageQueueGet(step_motor_msg_q, &msg, NULL, 0U) == osOK)
     {
       if(has_active_msg == true)
@@ -229,12 +210,13 @@ static void threadStepMotor(void *argument)
 
         case RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME:
 #ifdef _USE_SN04
-          target_evt = APP_EVT_SN04_1_DETECTED;
+          target_evt = STEP_MOTOR_HOME_SENSOR_EVT;
           is_target_move = true;
 
           if(taskStepMotorIsTargetDetected(target_evt) == true)
           {
             move_remain_step = 0;
+            taskStepMotorStopCurrent(move_ch);
             taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
             has_active_msg = false;
           }
@@ -251,12 +233,13 @@ static void threadStepMotor(void *argument)
 
         case RTOS_STEP_MOTOR_CMD_MOVE_TO_END:
 #ifdef _USE_SN04
-          target_evt = APP_EVT_SN04_2_DETECTED;
+          target_evt = STEP_MOTOR_END_SENSOR_EVT;
           is_target_move = true;
 
           if(taskStepMotorIsTargetDetected(target_evt) == true)
           {
             move_remain_step = 0;
+            taskStepMotorStopCurrent(move_ch);
             taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
             has_active_msg = false;
           }

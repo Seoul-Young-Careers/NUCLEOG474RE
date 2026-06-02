@@ -62,7 +62,6 @@ static bool servoMoveAndWait(float angle_deg);									// 서보를 지정 각�
 
 static bool delayInterruptible(uint32_t delay_ms);							// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
 
-static app_sequence_wait_t moveStepMotorToReadyPosition(void); // SN04_1 감지 후 SN04_2 방향으로 지정 스텝만큼 이동한다.
 static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);			// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
 static void setState(app_sequence_state_t state);								// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
 
@@ -150,18 +149,62 @@ app_sequence_state_t sequenceGetState(void)
 static bool runResetSequence(void)
 {
   app_sequence_wait_t wait_result;
+  uint32_t cmd_id;
 
   setState(APP_SEQUENCE_STATE_HOMING);
 
   (void)appEventClear(CONTROL_EVT);
   stopAllActuators();
 
-  wait_result = moveStepMotorToReadyPosition();
-  if(wait_result == APP_SEQUENCE_WAIT_RESET)
+  if(taskStepMotorMoveToHome(&cmd_id) != true)
   {
-    return runResetSequence();
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
   }
 
+  wait_result = waitStepMotor(cmd_id);
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(taskStepMotorMoveToEnd(&cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(taskStepMotorMoveStep(_DEF_DM542_1,
+                           STEP_MOTOR_READY_OFFSET_STEPS,
+                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
+                           &cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
   if(wait_result != APP_SEQUENCE_WAIT_DONE)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
@@ -178,6 +221,7 @@ static bool runResetSequence(void)
 static bool runStopSequence(void)
 {
   app_sequence_wait_t wait_result;
+  uint32_t cmd_id;
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
 
@@ -185,7 +229,13 @@ static bool runStopSequence(void)
   (void)taskValveClose(VALVE1_CH);
   (void)taskValveClose(VALVE2_CH);
 
-  wait_result = moveStepMotorToReadyPosition();
+  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
   if(wait_result == APP_SEQUENCE_WAIT_DONE)
   {
     (void)appEventClear(APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
@@ -457,34 +507,6 @@ static bool delayInterruptible(uint32_t delay_ms)
   return handleResetStopRequest() != true;
 }
 
-// SN04_1 감지 후 SN04_2 방향으로 지정 스텝만큼 이동한다.
-static app_sequence_wait_t moveStepMotorToReadyPosition(void)
-{
-  app_sequence_wait_t wait_result;
-  uint32_t cmd_id;
-
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
-  {
-    return APP_SEQUENCE_WAIT_ERROR;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-  if(wait_result != APP_SEQUENCE_WAIT_DONE)
-  {
-    return wait_result;
-  }
-
-  if(taskStepMotorMoveStep(_DEF_DM542_1,
-                           STEP_MOTOR_READY_OFFSET_STEPS,
-                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
-                           &cmd_id) != true)
-  {
-    return APP_SEQUENCE_WAIT_ERROR;
-  }
-
-  return waitStepMotor(cmd_id);
-}
-
 // 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
 static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
 {
@@ -497,6 +519,12 @@ static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
 
     if((evt & APP_EVT_RESET_REQ) != 0U)
     {
+      if(app_sequence_state == APP_SEQUENCE_STATE_HOMING)
+      {
+        (void)appEventClear(APP_EVT_RESET_REQ);
+        continue;
+      }
+
       return APP_SEQUENCE_WAIT_RESET;
     }
 
