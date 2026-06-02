@@ -21,16 +21,19 @@
 #define VALVE1_CH                   _DEF_2V025_1
 #define VALVE2_CH                   _DEF_2V025_2
 
+#define SERVO_BOOT_ANGLE_DEG        			180.0f
 #define SERVO_HOME_ANGLE_DEG        			170.0f
-#define SERVO_START_GRAB_BAG_ANGLE_DEG		70.0f
-#define SERVO_START_PUT_BAG_ANGLE_DEG     70.0f
-#define SERVO_START_OPEN_BAG_ANGLE_DEG		80.0f
+#define SERVO_START_GRAB_BAG_ANGLE_DEG		20.0f
+#define SERVO_START_PUT_BAG_ANGLE_DEG     60.0f
+#define SERVO_START_OPEN_BAG_ANGLE_DEG		170.0f
 #define SERVO_HOLD_ANGLE_DEG        			120.0f
 
-#define SERVO_WAIT_MS               500U
+#define SERVO_WAIT_MS               				500U
+#define SERVO_PUT_SETTLE_DELAY_MS      		300U
 
-#define STEP_MOTOR_READY_OFFSET_STEPS     200
-#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US 1000U
+#define STEP_MOTOR_READY_OFFSET_STEPS     	500
+#define STEP_MOTOR_START_OFFSET_STEPS				-300
+#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US 100U
 
 typedef enum
 {
@@ -47,11 +50,9 @@ static app_sequence_state_t app_sequence_state = APP_SEQUENCE_STATE_BOOT;
  */
 static bool runResetSequence(void);															// RESET 버튼 또는 전원 초기화 시 HOME 기준을 잡고 시작 위치로 이동시킨다.
 
-static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 때 스텝모터를 시작 위치로 이동시킨다.
+static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 때 밸브/서보를 초기화하고 스텝모터를 HOME으로 이동시킨다.
 
 static bool runStartSequence(void);															// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
-static bool runStartBeforeStepMove(void);												// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
-static bool runStartAfterStepMove(void);												// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
 
 static bool runFootSwitchSequence(void);												// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
 
@@ -65,9 +66,11 @@ static bool delayInterruptible(uint32_t delay_ms);							// 긴 대기 시간을
 static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);			// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
 static void setState(app_sequence_state_t state);								// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
 
-// 장비 시퀀스를 시작할 때 구동부를 초기 위치로 보정한다.
+// 부팅 시 장비 위치를 보정한 뒤 서보를 부팅 전용 초기 각도로 보낸다.
 bool sequenceInit(void)
 {
+	servoMoveAndWait(SERVO_BOOT_ANGLE_DEG);
+
   return runResetSequence();
 }
 
@@ -217,7 +220,7 @@ static bool runResetSequence(void)
   return true;
 }
 
-// STOP 버튼을 눌렀을 때 스텝모터를 시작 위치로 이동시킨다.
+// STOP 버튼을 눌렀을 때 밸브를 닫고 서보를 HOME 각도로 보낸 뒤 스텝모터를 HOME으로 이동시킨다.
 static bool runStopSequence(void)
 {
   app_sequence_wait_t wait_result;
@@ -225,9 +228,14 @@ static bool runStopSequence(void)
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_HOME);
 
-  (void)taskPumpOff();
   (void)taskValveClose(VALVE1_CH);
   (void)taskValveClose(VALVE2_CH);
+  (void)taskPumpOff();
+
+  if(servoMoveAndWait(SERVO_HOME_ANGLE_DEG) != true)
+  {
+    return false;
+  }
 
   if(taskStepMotorMoveToHome(&cmd_id) != true)
   {
@@ -255,62 +263,15 @@ static bool runStopSequence(void)
 }
 
 // START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
+// pump on -> valve on -> servo grab 각도 -> servo home 각도
+// end까지 간 후 -> -200
+// servo put 각도 -> 붙는 시간 대기 -> servo open 각도
 static bool runStartSequence(void)
 {
   app_sequence_wait_t wait_result;
   uint32_t cmd_id;
 
-  if(runStartBeforeStepMove() != true)
-  {
-    return false;
-  }
-
-  setState(APP_SEQUENCE_STATE_MOVING_TO_END);
-
-  if(taskStepMotorMoveToEnd(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-  if(wait_result == APP_SEQUENCE_WAIT_DONE)
-  {
-    if(runStartAfterStepMove() != true)
-    {
-      return false;
-    }
-
-    (void)appEventClear(APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
-    setState(APP_SEQUENCE_STATE_READY_SEQUENCE);
-    return true;
-  }
-
-  if(wait_result == APP_SEQUENCE_WAIT_RESET)
-  {
-    return runResetSequence();
-  }
-
-  if(wait_result == APP_SEQUENCE_WAIT_STOP)
-  {
-    (void)appEventClear(APP_EVT_STOP_REQ);
-    return runStopSequence();
-  }
-
-  setState(APP_SEQUENCE_STATE_ERROR);
-
-  return false;
-}
-
-// START 시퀀스에서 스텝모터 이동 전에 필요한 동작을 수행한다.
-static bool runStartBeforeStepMove(void)
-{
   setState(APP_SEQUENCE_STATE_START_ACTION);
-
-  if(servoMoveAndWait(SERVO_START_GRAB_BAG_ANGLE_DEG) != true)
-  {
-    return false;
-  }
 
   if(taskPumpOn() != true)
   {
@@ -321,29 +282,6 @@ static bool runStartBeforeStepMove(void)
   if(taskValveOpen(VALVE1_CH) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  if(handleResetStopRequest() == true)
-  {
-    return false;
-  }
-
-  if(servoMoveAndWait(SERVO_HOME_ANGLE_DEG) != true)
-  {
-    return false;
-  }
-
-  return true;
-}
-
-// START 시퀀스에서 스텝모터가 END에 도착한 뒤 필요한 동작을 수행한다.
-static bool runStartAfterStepMove(void)
-{
-  setState(APP_SEQUENCE_STATE_END_ACTION);
-
-  if(servoMoveAndWait(SERVO_START_PUT_BAG_ANGLE_DEG) != true)
-  {
     return false;
   }
 
@@ -358,10 +296,89 @@ static bool runStartAfterStepMove(void)
     return false;
   }
 
+  if(servoMoveAndWait(SERVO_START_GRAB_BAG_ANGLE_DEG) != true)
+  {
+    return false;
+  }
+
+  if(servoMoveAndWait(SERVO_HOME_ANGLE_DEG) != true)
+  {
+    return false;
+  }
+
+  setState(APP_SEQUENCE_STATE_MOVING_TO_END);
+
+  if(taskStepMotorMoveToEnd(&cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
+
+  if(wait_result == APP_SEQUENCE_WAIT_RESET)
+  {
+    return runResetSequence();
+  }
+
+  if(wait_result == APP_SEQUENCE_WAIT_STOP)
+  {
+    (void)appEventClear(APP_EVT_STOP_REQ);
+    return runStopSequence();
+  }
+
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  if(taskStepMotorMoveStep(_DEF_DM542_1,
+                           STEP_MOTOR_START_OFFSET_STEPS,
+                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
+                           &cmd_id) != true)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  wait_result = waitStepMotor(cmd_id);
+
+  if(wait_result == APP_SEQUENCE_WAIT_RESET)
+  {
+    return runResetSequence();
+  }
+
+  if(wait_result == APP_SEQUENCE_WAIT_STOP)
+  {
+    (void)appEventClear(APP_EVT_STOP_REQ);
+    return runStopSequence();
+  }
+
+  if(wait_result != APP_SEQUENCE_WAIT_DONE)
+  {
+    setState(APP_SEQUENCE_STATE_ERROR);
+    return false;
+  }
+
+  setState(APP_SEQUENCE_STATE_END_ACTION);
+  if(servoMoveAndWait(SERVO_START_PUT_BAG_ANGLE_DEG) != true)
+  {
+    return false;
+  }
+
+  if(delayInterruptible(SERVO_PUT_SETTLE_DELAY_MS) != true)
+  {
+    return false;
+  }
+
   if(servoMoveAndWait(SERVO_START_OPEN_BAG_ANGLE_DEG) != true)
   {
     return false;
   }
+
+  (void)appEventClear(APP_EVT_START_REQ | APP_EVT_FOOT_PRESS);
+  setState(APP_SEQUENCE_STATE_READY_SEQUENCE);
 
   return true;
 }

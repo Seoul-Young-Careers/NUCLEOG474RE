@@ -129,12 +129,12 @@ bool v025IsReady(uint8_t ch)
 
 bool v025ValveOpen(uint8_t ch)
 {
-  return v025ValveSet(ch, true);
+  return v025ValveSet(ch, false);
 }
 
 bool v025ValveClose(uint8_t ch)
 {
-  return v025ValveSet(ch, false);
+  return v025ValveSet(ch, true);
 }
 
 bool v025ValveSet(uint8_t ch, bool open)
