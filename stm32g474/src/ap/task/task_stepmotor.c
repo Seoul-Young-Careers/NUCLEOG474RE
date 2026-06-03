@@ -11,6 +11,14 @@
 #define STEP_MOTOR_IDLE_MS             1U
 #define STEP_MOTOR_PULSE_DELAY_US      500U
 #define STEP_MOTOR_TRAVEL_MAX_STEPS    20000
+#define STEP_MOTOR_SENSOR_TRAVEL_STEPS 2700U
+#define STEP_MOTOR_READY_OFFSET_STEPS  200U
+#define STEP_MOTOR_END_TRAVEL_STEPS    (STEP_MOTOR_SENSOR_TRAVEL_STEPS - STEP_MOTOR_READY_OFFSET_STEPS)
+#define STEP_MOTOR_SENSOR_SLOW_STEPS   300U
+#define STEP_MOTOR_SENSOR_FAST_DELAY_US STEP_MOTOR_PULSE_DELAY_US
+#define STEP_MOTOR_SENSOR_SLOW_DELAY_US 1000U
+#define STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS 50U
+#define STEP_MOTOR_SENSOR_SLOW_CHUNK_STEPS 1U
 
 #define STEP_MOTOR_HOME_DIR            (-1)
 #define STEP_MOTOR_END_DIR             1
@@ -27,6 +35,9 @@ static uint32_t taskStepMotorNextCmdId(void);
 static bool taskStepMotorPutMsg(rtos_step_motor_msg_t *p_msg, uint32_t *p_cmd_id, bool clear_queue);
 static void taskStepMotorSendAck(const rtos_step_motor_msg_t *p_msg, rtos_step_motor_ack_result_t result);
 static void taskStepMotorStopCurrent(uint8_t ch);
+static uint32_t taskStepMotorAbsStep(int32_t step);
+static uint32_t taskStepMotorGetSensorMoveDelay(uint32_t done_step, uint32_t profile_step, uint32_t default_delay_us);
+static uint32_t taskStepMotorGetSensorMoveChunk(uint32_t done_step, uint32_t profile_step, uint32_t remain_step);
 
 #ifdef _USE_SN04
 static bool taskStepMotorIsTargetDetected(uint32_t target_evt);
@@ -90,7 +101,7 @@ bool taskStepMotorMoveToHome(uint32_t *p_cmd_id)
   msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME;
   msg.ch             = _DEF_DM542_1;
   msg.step           = STEP_MOTOR_HOME_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
-  msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+  msg.pulse_delay_us = STEP_MOTOR_SENSOR_FAST_DELAY_US;
 
   return taskStepMotorPutMsg(&msg, p_cmd_id, true);
 }
@@ -102,7 +113,7 @@ bool taskStepMotorMoveToEnd(uint32_t *p_cmd_id)
   msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_END;
   msg.ch             = _DEF_DM542_1;
   msg.step           = STEP_MOTOR_END_DIR * STEP_MOTOR_TRAVEL_MAX_STEPS;
-  msg.pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+  msg.pulse_delay_us = STEP_MOTOR_SENSOR_FAST_DELAY_US;
 
   return taskStepMotorPutMsg(&msg, p_cmd_id, true);
 }
@@ -176,6 +187,8 @@ static void threadStepMotor(void *argument)
   uint8_t move_ch = _DEF_DM542_1;
   int32_t move_remain_step = 0;
   uint32_t move_pulse_delay_us = STEP_MOTOR_PULSE_DELAY_US;
+  uint32_t move_done_step = 0U;
+  uint32_t move_profile_step = STEP_MOTOR_SENSOR_TRAVEL_STEPS;
   uint32_t target_evt = 0U;
   bool is_target_move = false;
 
@@ -194,6 +207,8 @@ static void threadStepMotor(void *argument)
       has_active_msg = true;
       move_ch = msg.ch;
       move_pulse_delay_us = msg.pulse_delay_us;
+      move_done_step = 0U;
+      move_profile_step = STEP_MOTOR_SENSOR_TRAVEL_STEPS;
       target_evt = 0U;
       is_target_move = false;
 
@@ -212,6 +227,7 @@ static void threadStepMotor(void *argument)
 #ifdef _USE_SN04
           target_evt = STEP_MOTOR_HOME_SENSOR_EVT;
           is_target_move = true;
+          move_profile_step = STEP_MOTOR_SENSOR_TRAVEL_STEPS;
 
           if(taskStepMotorIsTargetDetected(target_evt) == true)
           {
@@ -235,6 +251,7 @@ static void threadStepMotor(void *argument)
 #ifdef _USE_SN04
           target_evt = STEP_MOTOR_END_SENSOR_EVT;
           is_target_move = true;
+          move_profile_step = STEP_MOTOR_END_TRAVEL_STEPS;
 
           if(taskStepMotorIsTargetDetected(target_evt) == true)
           {
@@ -283,11 +300,24 @@ static void threadStepMotor(void *argument)
 
     if(move_remain_step != 0)
     {
-      int32_t step = (move_remain_step > 0) ? 1 : -1;
+      uint32_t chunk_step = 1U;
+      int32_t step;
+      uint32_t pulse_delay_us = move_pulse_delay_us;
 
-      if(dm542MoveStep(move_ch, step, move_pulse_delay_us) == true)
+      if(is_target_move == true)
+      {
+        pulse_delay_us = taskStepMotorGetSensorMoveDelay(move_done_step, move_profile_step, move_pulse_delay_us);
+        chunk_step = taskStepMotorGetSensorMoveChunk(move_done_step,
+                                                     move_profile_step,
+                                                     taskStepMotorAbsStep(move_remain_step));
+      }
+
+      step = (move_remain_step > 0) ? (int32_t)chunk_step : -(int32_t)chunk_step;
+
+      if(dm542MoveStep(move_ch, step, pulse_delay_us) == true)
       {
         move_remain_step -= step;
+        move_done_step += chunk_step;
 
         if(move_remain_step == 0)
         {
@@ -341,9 +371,89 @@ static void taskStepMotorStopCurrent(uint8_t ch)
   (void)dm542Stop(ch);
 }
 
+static uint32_t taskStepMotorAbsStep(int32_t step)
+{
+  if(step >= 0)
+  {
+    return (uint32_t)step;
+  }
+
+  return (uint32_t)(-(step + 1)) + 1U;
+}
+
+static uint32_t taskStepMotorGetSensorMoveDelay(uint32_t done_step, uint32_t profile_step, uint32_t default_delay_us)
+{
+  uint32_t slow_start_step;
+
+  if(profile_step <= (STEP_MOTOR_SENSOR_SLOW_STEPS * 2U))
+  {
+    return STEP_MOTOR_SENSOR_SLOW_DELAY_US;
+  }
+
+  slow_start_step = profile_step - STEP_MOTOR_SENSOR_SLOW_STEPS;
+
+  if(done_step < STEP_MOTOR_SENSOR_SLOW_STEPS)
+  {
+    return STEP_MOTOR_SENSOR_SLOW_DELAY_US;
+  }
+
+  if(done_step >= slow_start_step)
+  {
+    return STEP_MOTOR_SENSOR_SLOW_DELAY_US;
+  }
+
+  return default_delay_us;
+}
+
+static uint32_t taskStepMotorGetSensorMoveChunk(uint32_t done_step, uint32_t profile_step, uint32_t remain_step)
+{
+  uint32_t chunk_step = STEP_MOTOR_SENSOR_SLOW_CHUNK_STEPS;
+  uint32_t slow_start_step;
+  uint32_t remain_fast_step;
+
+  if(remain_step == 0U)
+  {
+    return 0U;
+  }
+
+  if(profile_step > (STEP_MOTOR_SENSOR_SLOW_STEPS * 2U))
+  {
+    slow_start_step = profile_step - STEP_MOTOR_SENSOR_SLOW_STEPS;
+
+    if((done_step >= STEP_MOTOR_SENSOR_SLOW_STEPS) && (done_step < slow_start_step))
+    {
+      remain_fast_step = slow_start_step - done_step;
+      chunk_step = STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS;
+      if(chunk_step > remain_fast_step)
+      {
+        chunk_step = remain_fast_step;
+      }
+    }
+  }
+
+  if(chunk_step > remain_step)
+  {
+    chunk_step = remain_step;
+  }
+
+  if(chunk_step == 0U)
+  {
+    chunk_step = 1U;
+  }
+
+  return chunk_step;
+}
+
 #ifdef _USE_SN04
 static bool taskStepMotorIsTargetDetected(uint32_t target_evt)
 {
+  uint32_t evt_flags = appEventGet();
+
+  if((evt_flags & target_evt) != 0U)
+  {
+    return true;
+  }
+
   switch(target_evt)
   {
     case APP_EVT_SN04_1_DETECTED:
