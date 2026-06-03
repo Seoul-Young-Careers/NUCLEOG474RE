@@ -17,8 +17,8 @@ extern "C" {
 #ifdef _USE_BTS7960
 
 #define BTS7960_MAX_CH                 HW_BTS7960_MAX_CH
-#define BTS7960_FREQ_HZ                20000U
-#define BTS7960_LOCK_TIMEOUT_MS        100U
+#define BTS7960_FREQ_HZ                20000
+#define BTS7960_LOCK_TIMEOUT_MS        100
 
 
 typedef enum

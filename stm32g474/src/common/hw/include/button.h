@@ -13,7 +13,7 @@
 #ifdef _USE_HW_BUTTON
 
 #define BUTTON_MAX_CH			HW_BUTTON_MAX_CH
-#define BUTTON_LOCK_TIMEOUT_MS  100U
+#define BUTTON_LOCK_TIMEOUT_MS  100
 
 typedef struct
 {

@@ -15,20 +15,20 @@
 #include "task/task_valve.h"
 
 #define CONTROL_EVT                 (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS)
-#define ACK_WAIT_MS                 10U
+#define ACK_WAIT_MS                 10
 
 #define SERVO_CH                              _DEF_DS3120MG1
 #define VALVE1_CH                             _DEF_2V025_1
 #define VALVE2_CH                             _DEF_2V025_2
 
 #define SERVO_HOME_ANGLE_DEG        			    180.0f    
-#define SERVO_START_GRAB_BAG_ANGLE_DEG		    20.0f
-#define SERVO_START_PUT_BAG_ANGLE_DEG         60.0f
-#define SERVO_START_OPEN_BAG_ANGLE_DEG		    170.0f
+#define SERVO_START_GRAB_BAG_ANGLE_DEG		    	20.0f
+#define SERVO_START_PUT_BAG_ANGLE_DEG         		60.0f
+#define SERVO_START_OPEN_BAG_ANGLE_DEG		    	170.0f
 #define SERVO_HOLD_ANGLE_DEG        			    120.0f
 
-#define SERVO_WAIT_MS               				  500U
-#define SERVO_PUT_SETTLE_DELAY_MS      		    300U
+#define SERVO_WAIT_MS               				  500
+#define SERVO_PUT_SETTLE_DELAY_MS      		    300
 
 typedef enum
 {
@@ -52,7 +52,8 @@ static bool runStartSequence(void);															// START 버튼을 눌렀을 �
 static bool runFootSwitchSequence(void);												// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
 
 static bool isStopSequenceAllowed(void);												// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
-static void stopAllActuators(void);															// reset시 모든 구동부를 안전한 기본 상태로 되돌린다.
+static void enterErrorState(void);														// 에러 발생 시 모든 구동부를 안전 상태로 내리고 ERROR 상태로 고정한다.
+static void stopAllActuators(void);															// reset/error 시 모든 구동부를 안전한 기본 상태로 되돌린다.
 static bool handleResetStopRequest(void);												// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
 static bool servoMoveAndWait(float angle_deg);									// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
 
@@ -101,7 +102,6 @@ void sequenceProcess(void)
     else
     {
       (void)appEventClear(APP_EVT_STOP_REQ);
-      logPrintf("sequence stop \t\t: ignored\r\n");
     }
     return;
   }
@@ -116,7 +116,6 @@ void sequenceProcess(void)
     else
     {
       (void)appEventClear(APP_EVT_START_REQ);
-      logPrintf("sequence start \t\t: ignored\r\n");
     }
     return;
   }
@@ -131,7 +130,6 @@ void sequenceProcess(void)
     else
     {
       (void)appEventClear(APP_EVT_FOOT_PRESS);
-      logPrintf("sequence foot \t\t: ignored\r\n");
     }
     return;
   }
@@ -157,7 +155,7 @@ static bool runResetSequence(void)
   // RESET 시에는 End 센서까지 갔다가 Home 센서까지 돌아오는 Calibration 명령 하나만 수행한다.
   if(taskStepMotorCalibration(&cmd_id) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -165,7 +163,7 @@ static bool runResetSequence(void)
 
   if(wait_result != APP_SEQUENCE_WAIT_DONE)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -194,7 +192,7 @@ static bool runStopSequence(void)
 
   if(taskStepMotorMoveToZero(&cmd_id) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -212,7 +210,7 @@ static bool runStopSequence(void)
     return false;
   }
 
-  setState(APP_SEQUENCE_STATE_ERROR);
+  enterErrorState();
 
   return false;
 }
@@ -230,19 +228,19 @@ static bool runStartSequence(void)
 
   if(taskPumpOn() != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
   if(taskValveOpen(VALVE1_CH) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
   if(taskValveOpen(VALVE2_CH) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -265,7 +263,7 @@ static bool runStartSequence(void)
 
   if(taskStepMotorMoveToFull(&cmd_id) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -284,7 +282,7 @@ static bool runStartSequence(void)
 
   if(wait_result != APP_SEQUENCE_WAIT_DONE)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -315,7 +313,6 @@ static bool runFootSwitchSequence(void)
 {
   if(app_sequence_state != APP_SEQUENCE_STATE_READY_SEQUENCE)
   {
-    logPrintf("sequence foot \t\t: ignored\r\n");
     return false;
   }
 
@@ -353,7 +350,15 @@ static bool isStopSequenceAllowed(void)
   }
 }
 
-// reset/home 시 모든 구동부를 안전한 기본 상태로 되돌린다.
+// 에러 발생 시 모든 구동부를 안전 상태로 내리고 ERROR 상태로 고정한다.
+static void enterErrorState(void)
+{
+  stopAllActuators();
+  (void)appEventClear(CONTROL_EVT);
+  setState(APP_SEQUENCE_STATE_ERROR);
+}
+
+// reset/error 시 모든 구동부를 안전한 기본 상태로 되돌린다.
 static void stopAllActuators(void)
 {
   (void)taskStepMotorStop(NULL);
@@ -405,7 +410,6 @@ static bool handleResetStopRequest(void)
     }
 
     (void)appEventClear(APP_EVT_STOP_REQ);
-    logPrintf("sequence stop \t\t: ignored\r\n");
   }
 
   return false;
@@ -421,7 +425,7 @@ static bool servoMoveAndWait(float angle_deg)
 
   if(taskServoRun(SERVO_CH, angle_deg) != true)
   {
-    setState(APP_SEQUENCE_STATE_ERROR);
+    enterErrorState();
     return false;
   }
 
@@ -481,7 +485,6 @@ static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
       }
 
       (void)appEventClear(APP_EVT_STOP_REQ);
-      logPrintf("sequence stop \t\t: ignored\r\n");
     }
 
     if(taskStepMotorGetAck(&ack, ACK_WAIT_MS) != true)
@@ -509,9 +512,8 @@ static app_sequence_wait_t waitStepMotor(uint32_t cmd_id)
   }
 }
 
-// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
+// 현재 시퀀스 상태를 갱신한다.
 static void setState(app_sequence_state_t state)
 {
   app_sequence_state = state;
-  logPrintf("sequence state \t\t: %d\r\n", state);
 }

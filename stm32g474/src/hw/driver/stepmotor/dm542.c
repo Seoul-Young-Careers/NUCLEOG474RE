@@ -29,8 +29,6 @@ typedef struct
   bool is_async_move;
   // 비동기 이동 중 position_step을 갱신하기 위해 방향을 저장한다.
   bool async_dir;
-  // Home/End 같은 센서 타겟 이동 중일 때만 EXTI 정지를 허용한다.
-  bool sensor_stop_enabled;
 
   int32_t position_step;
   uint32_t remain_step;
@@ -45,7 +43,6 @@ static dm542_tbl_t dm542_tbl[DM542_MAX_CH] =
     .is_busy        = false,
     .is_async_move  = false,
     .async_dir      = false,
-    .sensor_stop_enabled = false,
 
     .position_step  = 0,
     .remain_step    = 0,
@@ -96,7 +93,6 @@ bool dm542Init(void)
     dm542_tbl[i].is_busy       = false;
     dm542_tbl[i].is_async_move = false;
     dm542_tbl[i].async_dir     = false;
-    dm542_tbl[i].sensor_stop_enabled = false;
     dm542_tbl[i].position_step = 0;
     dm542_tbl[i].remain_step   = 0;
     dm542_tbl[i].done_callback = NULL;
@@ -137,7 +133,6 @@ bool dm542Open(uint8_t ch)
     dm542_tbl[ch].is_busy       = false;
     dm542_tbl[ch].is_async_move = false;
     dm542_tbl[ch].async_dir     = false;
-    dm542_tbl[ch].sensor_stop_enabled = false;
     dm542_tbl[ch].position_step = 0;
     dm542_tbl[ch].remain_step   = 0;
     dm542_tbl[ch].is_open       = true;
@@ -232,11 +227,10 @@ bool dm542Stop(uint8_t ch)
 
     if(pwmStop(DM542_PUL) != true) break;
 
-    // 정지 후에는 비동기 이동과 센서 정지 허용 상태를 모두 해제한다.
-    dm542_tbl[ch].remain_step         = 0U;
-    dm542_tbl[ch].is_busy             = false;
-    dm542_tbl[ch].is_async_move       = false;
-    dm542_tbl[ch].sensor_stop_enabled = false;
+    // 정지 후에는 비동기 이동 상태를 해제한다.
+    dm542_tbl[ch].remain_step   = 0U;
+    dm542_tbl[ch].is_busy       = false;
+    dm542_tbl[ch].is_async_move = false;
     ret = true;
   } while(0);
 
@@ -489,7 +483,6 @@ bool dm542MoveStepAsync(uint8_t ch, int32_t step, uint32_t pulse_delay_us)
     dm542_tbl[ch].is_busy             = true;
     dm542_tbl[ch].is_async_move       = true;
     dm542_tbl[ch].async_dir           = dir;
-    dm542_tbl[ch].sensor_stop_enabled = false;
     dm542_tbl[ch].remain_step         = step_count;
 
     // 지정한 step_count만큼 STEP pulse를 Timer가 자동 출력하도록 시작한다.
@@ -528,24 +521,6 @@ bool dm542AttachDoneCallback(uint8_t ch, dm542_done_callback_t callback)
   return ret;
 }
 
-bool dm542EnableSensorStop(uint8_t ch, bool enable)
-{
-  bool ret = false;
-
-  if(dm542Lock() != true) return false;
-
-  if(ch < DM542_MAX_CH)
-  {
-    // Home/End 이동 중에만 센서 EXTI가 PWM을 즉시 끊을 수 있게 한다.
-    dm542_tbl[ch].sensor_stop_enabled = enable;
-    ret = true;
-  }
-
-  dm542Unlock();
-
-  return ret;
-}
-
 bool dm542StopFromISR(uint8_t ch)
 {
   uint32_t pwm_remain;
@@ -557,9 +532,8 @@ bool dm542StopFromISR(uint8_t ch)
   if(dm542_tbl[ch].is_busy != true)
   {
     // 이미 멈춘 상태라면 남아 있을 수 있는 async 플래그만 정리한다.
-    dm542_tbl[ch].remain_step         = 0U;
-    dm542_tbl[ch].is_async_move       = false;
-    dm542_tbl[ch].sensor_stop_enabled = false;
+    dm542_tbl[ch].remain_step   = 0U;
+    dm542_tbl[ch].is_async_move = false;
     return true;
   }
 
@@ -578,10 +552,9 @@ bool dm542StopFromISR(uint8_t ch)
   if(pwmStopFromISR(DM542_PUL) != true) return false;
 
   // ISR 정지 후에는 task가 다시 명령을 줄 수 있도록 상태를 비운다.
-  dm542_tbl[ch].remain_step         = 0U;
-  dm542_tbl[ch].is_busy             = false;
-  dm542_tbl[ch].is_async_move       = false;
-  dm542_tbl[ch].sensor_stop_enabled = false;
+  dm542_tbl[ch].remain_step   = 0U;
+  dm542_tbl[ch].is_busy       = false;
+  dm542_tbl[ch].is_async_move = false;
 
   return true;
 }
@@ -688,10 +661,9 @@ static void dm542EndMove(uint8_t ch)
   if(ch < DM542_MAX_CH)
   {
     // 에러 종료 시 async 관련 상태가 다음 명령에 영향을 주지 않도록 정리한다.
-    dm542_tbl[ch].remain_step         = 0U;
-    dm542_tbl[ch].is_busy             = false;
-    dm542_tbl[ch].is_async_move       = false;
-    dm542_tbl[ch].sensor_stop_enabled = false;
+    dm542_tbl[ch].remain_step   = 0U;
+    dm542_tbl[ch].is_busy       = false;
+    dm542_tbl[ch].is_async_move = false;
   }
 
   dm542Unlock();
@@ -768,11 +740,10 @@ static void dm542PwmDoneCallback(uint8_t pwm_ch)
   // count 출력이 정상 완료된 경우에는 남은 step 전체가 이동됐다고 본다.
   dm542ApplyMovedStep(ch, dm542_tbl[ch].remain_step, dm542_tbl[ch].async_dir);
 
-  // 완료 후 상태를 정리하고 센서 정지 허용도 해제한다.
-  dm542_tbl[ch].remain_step         = 0U;
-  dm542_tbl[ch].is_busy             = false;
-  dm542_tbl[ch].is_async_move       = false;
-  dm542_tbl[ch].sensor_stop_enabled = false;
+  // 완료 후 상태를 정리한다.
+  dm542_tbl[ch].remain_step   = 0U;
+  dm542_tbl[ch].is_busy       = false;
+  dm542_tbl[ch].is_async_move = false;
 
   done_callback = dm542_tbl[ch].done_callback;
   if(done_callback != NULL)

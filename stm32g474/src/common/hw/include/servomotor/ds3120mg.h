@@ -18,14 +18,14 @@ extern "C" {
 
 #define DS3120MG_MAX_CH                 HW_DS3120MG_MAX
 
-#define DS3120MG_FREQ_HZ                300U
+#define DS3120MG_FREQ_HZ                300
 
-#define DS3120MG_MIN_PULSE_US           500U
-#define DS3120MG_MID_PULSE_US           1500U
-#define DS3120MG_MAX_PULSE_US           2500U
-#define DS3120MG_ANGLE_DEG              170.0f
+#define DS3120MG_MIN_PULSE_US           500
+#define DS3120MG_MID_PULSE_US           1500
+#define DS3120MG_MAX_PULSE_US           2500
+#define DS3120MG_ANGLE_DEG              180.0f
 #define DS3120MG_MAX_ANGLE_DEG          180.0f
-#define DS3120MG_LOCK_TIMEOUT_MS        100U
+#define DS3120MG_LOCK_TIMEOUT_MS        100
 
 typedef struct
 {

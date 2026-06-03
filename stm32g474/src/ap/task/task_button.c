@@ -15,8 +15,8 @@ typedef struct
   uint8_t cnt;
 } button_db_t;
 
-#define BUTTON_DEBOUNCE_COUNT   3U
-#define BUTTON_SCAN_MS          10U
+#define BUTTON_DEBOUNCE_COUNT   3
+#define BUTTON_SCAN_MS          10
 
 static void threadButton(void *argument);
 static bool buttonUpdate(button_db_t *p_btn, bool raw);

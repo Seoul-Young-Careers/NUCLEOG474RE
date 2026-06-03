@@ -18,7 +18,7 @@ extern "C" {
 
 #define HX711_MAX										HW_HX711_MAX
 
-#define LOADCELL_DEFAULT_SAMPLE_COUNT   10U
+#define LOADCELL_DEFAULT_SAMPLE_COUNT   10
 #define LOADCELL_DEFAULT_SCALE          1.0f
 
 	typedef struct

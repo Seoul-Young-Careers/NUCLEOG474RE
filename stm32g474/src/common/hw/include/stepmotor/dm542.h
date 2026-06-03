@@ -19,7 +19,7 @@ extern "C" {
 #define DM542_MAX_CH 		 HW_DM542_MAX
 #define DM542_PUL				_DEF_PWM2
 #define DM542_DIR				0
-#define DM542_LOCK_TIMEOUT_MS  100U
+#define DM542_LOCK_TIMEOUT_MS  100
 
 typedef struct
 {
@@ -49,7 +49,6 @@ bool dm542SetFreq(uint8_t ch, uint32_t freq_hz);                              //
 bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us);         // Move by step count
 bool dm542MoveStepAsync(uint8_t ch, int32_t step, uint32_t pulse_delay_us);    // step 이동을 시작만 하고 바로 반환
 bool dm542AttachDoneCallback(uint8_t ch, dm542_done_callback_t callback);      // 비동기 이동 완료 콜백 등록
-bool dm542EnableSensorStop(uint8_t ch, bool enable);                           // 호환용 센서 정지 설정, 현재 SN04 정지는 항상 허용
 bool dm542StopFromISR(uint8_t ch);                                             // 인터럽트 안에서 비동기 이동 정지
 bool dm542StopBySensorFromISR(uint8_t ch);                                     // 센서 ISR에서 이동 종류와 상관없이 정지
 bool dm542MoveMm(uint8_t ch, float mm, uint32_t pulse_delay_us);               // Move by distance in mm

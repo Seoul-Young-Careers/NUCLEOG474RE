@@ -11,25 +11,24 @@
 #include "def.h"
 #include "rtos_def.h"
 
-#define APP_EVT_RESET_REQ        (1U << 0)
-#define APP_EVT_STOP_REQ         (1U << 1)
-#define APP_EVT_START_REQ        (1U << 2)
-#define APP_EVT_FOOT_PRESS       (1U << 3)
-#define APP_EVT_SN04_1_DETECTED  (1U << 4)
-#define APP_EVT_SN04_2_DETECTED  (1U << 5)
+#define APP_EVT_RESET_REQ        (1 << 0)
+#define APP_EVT_STOP_REQ         (1 << 1)
+#define APP_EVT_START_REQ        (1 << 2)
+#define APP_EVT_FOOT_PRESS       (1 << 3)
+#define APP_EVT_SN04_1_DETECTED  (1 << 4)
+#define APP_EVT_SN04_2_DETECTED  (1 << 5)
 // DM542 비동기 STEP 출력이 지정 count만큼 끝났음을 알리는 이벤트
-#define APP_EVT_STEP_MOTOR_DONE  (1U << 6)
+#define APP_EVT_STEP_MOTOR_DONE  (1 << 6)
 
 typedef enum
 {
-  RTOS_STEP_MOTOR_CMD_NONE = 0,
-  RTOS_STEP_MOTOR_CMD_MOVE_STEP,
-  RTOS_STEP_MOTOR_CMD_MOVE_TO_ZERO,
-  RTOS_STEP_MOTOR_CMD_MOVE_TO_FULL,
-  RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME,
-  RTOS_STEP_MOTOR_CMD_MOVE_TO_END,
-  RTOS_STEP_MOTOR_CMD_CALIBRATION,
-  RTOS_STEP_MOTOR_CMD_STOP,
+  RTOS_STEP_MOTOR_NONE = 0,
+  RTOS_STEP_MOTOR_MOVE_TO_ZERO,
+  RTOS_STEP_MOTOR_MOVE_TO_FULL,
+  RTOS_STEP_MOTOR_MOVE_TO_HOME,
+  RTOS_STEP_MOTOR_MOVE_TO_END,
+  RTOS_STEP_MOTOR_CALIBRATION,
+  RTOS_STEP_MOTOR_STOP,
 } rtos_step_motor_cmd_t;
 
 typedef enum

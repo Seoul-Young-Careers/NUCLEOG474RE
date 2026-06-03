@@ -15,6 +15,8 @@ extern "C" {
 #endif
 
 bool taskSensorInit(void);
+void taskSensorSetDm542StopIgnore(uint32_t evt_mask);
+void taskSensorClearDm542StopIgnore(uint32_t evt_mask);
 
 #ifdef __cplusplus
 }

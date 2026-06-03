@@ -8,7 +8,10 @@
 #include "task/task_sensor.h"
 #include "task/app_event.h"
 
-#define SENSOR_SCAN_MS          10U
+#define SENSOR_SCAN_MS          10
+
+// 이미 눌린 limit 센서에서 반대 방향으로 빠져나갈 때, 해당 센서만 DM542 즉시 정지에서 제외한다.
+static volatile uint32_t sensor_dm542_stop_ignore_evt = 0U;
 
 static void threadSensor(void *argument);
 static uint32_t sensorGetSn04EventBit(uint8_t ch);
@@ -24,6 +27,16 @@ bool taskSensorInit(void)
 #endif
 
   return osThreadNew(threadSensor, NULL, rtosGetSensorThreadAttr()) != NULL;
+}
+
+void taskSensorSetDm542StopIgnore(uint32_t evt_mask)
+{
+  sensor_dm542_stop_ignore_evt = evt_mask;
+}
+
+void taskSensorClearDm542StopIgnore(uint32_t evt_mask)
+{
+  sensor_dm542_stop_ignore_evt &= ~evt_mask;
 }
 
 static void threadSensor(void *argument)
@@ -49,6 +62,7 @@ static void threadSensor(void *argument)
       }
       else
       {
+        taskSensorClearDm542StopIgnore(evt_bit);
         (void)appEventClear(evt_bit);
       }
     }
@@ -83,12 +97,17 @@ static void sensorSn04IsrHandler(uint8_t ch, bool detected)
 
   if(detected == true)
   {
-    // SN04가 감지되면 이동 종류와 상관없이 STEP PWM을 즉시 정지한다.
-    (void)dm542StopBySensorFromISR(_DEF_DM542_1);
+    // 빠져나가는 중인 limit 센서는 release 전까지 DM542 ISR 정지에서 제외한다.
+    if((sensor_dm542_stop_ignore_evt & evt_bit) == 0U)
+    {
+      (void)dm542StopBySensorFromISR(_DEF_DM542_1);
+    }
+
     (void)appEventSet(evt_bit);
   }
   else
   {
+    taskSensorClearDm542StopIgnore(evt_bit);
     (void)appEventClear(evt_bit);
   }
 }

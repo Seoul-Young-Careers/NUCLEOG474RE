@@ -13,15 +13,6 @@
 #include "cmsis_os2.h"
 #include "rtos.h"
 
-#define _USE_LOG_PRINT    1
-
-#if _USE_LOG_PRINT
-#define logPrintf(fmt, ...)     printf(fmt, ##__VA_ARGS__)
-#else
-#define logPrintf(fmt, ...)
-#endif
-
-
 #include "stm32g4xx_hal.h"
 //#include "cmsis_os2.h"
 

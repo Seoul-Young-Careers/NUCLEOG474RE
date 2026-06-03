@@ -46,7 +46,7 @@ static const IRQn_Type sn04_irq_tbl[SN04_MAX_CH] =
   EXTI4_IRQn,      /* SN04_2: PB4  -> EXTI line 4  */
 };
 
-#define SN04_EXTI_IRQ_PRIO   5U
+#define SN04_EXTI_IRQ_PRIO   5
 
 static sn04_tbl_t sn04_tbl[SN04_MAX_CH];
 static volatile sn04_callback_t sn04_callback = NULL;

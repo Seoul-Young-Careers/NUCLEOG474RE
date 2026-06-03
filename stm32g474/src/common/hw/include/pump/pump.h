@@ -16,7 +16,7 @@ extern "C" {
 
 #ifdef _USE_PUMP
 
-#define PUMP_LOCK_TIMEOUT_MS           100U
+#define PUMP_LOCK_TIMEOUT_MS           100
 
 typedef struct
 {
