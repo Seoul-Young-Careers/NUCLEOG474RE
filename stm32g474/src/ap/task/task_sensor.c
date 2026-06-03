@@ -83,7 +83,7 @@ static void sensorSn04IsrHandler(uint8_t ch, bool detected)
 
   if(detected == true)
   {
-    // 센서 타겟 이동 중이면 SN04 EXTI에서 STEP PWM을 즉시 정지한다.
+    // SN04가 감지되면 이동 종류와 상관없이 STEP PWM을 즉시 정지한다.
     (void)dm542StopBySensorFromISR(_DEF_DM542_1);
     (void)appEventSet(evt_bit);
   }

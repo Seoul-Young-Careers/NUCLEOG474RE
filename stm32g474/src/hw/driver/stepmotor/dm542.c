@@ -588,10 +588,7 @@ bool dm542StopFromISR(uint8_t ch)
 
 bool dm542StopBySensorFromISR(uint8_t ch)
 {
-  if(ch >= DM542_MAX_CH) return false;
-  // 센서 타겟 이동이 아닌 일반 이동은 SN04 감지만으로 멈추지 않는다.
-  if(dm542_tbl[ch].sensor_stop_enabled != true) return false;
-
+  // SN04가 감지되면 이동 종류와 상관없이 즉시 STEP PWM을 정지한다.
   return dm542StopFromISR(ch);
 }
 
@@ -631,6 +628,27 @@ bool dm542ReadData(uint8_t ch, dm542_data_t *p_data)
     p_data->position_step = dm542_tbl[ch].position_step;
     p_data->remain_step   = dm542_tbl[ch].remain_step;
 
+    ret = true;
+  } while(0);
+
+  dm542Unlock();
+
+  return ret;
+}
+
+bool dm542SetPositionStep(uint8_t ch, int32_t position_step)
+{
+  bool ret = false;
+
+  if(dm542Lock() != true) return false;
+
+  do
+  {
+    if(ch >= DM542_MAX_CH) break;
+    if(dm542_tbl[ch].is_open != true) break;
+    if(dm542_tbl[ch].is_busy == true) break;
+
+    dm542_tbl[ch].position_step = position_step;
     ret = true;
   } while(0);
 

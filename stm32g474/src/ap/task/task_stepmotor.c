@@ -14,15 +14,15 @@
 #define STEP_MOTOR_TRAVEL_MAX_STEPS    								33000   // Home/End 센서를 찾을 때 안전상 최대로 이동할 수 있는 step 수
 #define STEP_MOTOR_SENSOR_TRAVEL_STEPS 								64000U   // 센서 이동 프로파일 계산에 사용하는 기준 이동 거리(step)
 
-#define STEP_MOTOR_READY_OFFSET_STEPS  								800U    // End 이동 시 센서 기준 위치에서 준비 위치만큼 빼기 위한 offset step
+#define STEP_MOTOR_READY_OFFSET_STEPS  								1600U    // End 이동 시 센서 기준 위치에서 준비 위치만큼 빼기 위한 offset step
 #define STEP_MOTOR_END_TRAVEL_STEPS    								(STEP_MOTOR_SENSOR_TRAVEL_STEPS - STEP_MOTOR_READY_OFFSET_STEPS) // End 방향 프로파일 거리에서 준비 offset을 뺀 값
-#define STEP_MOTOR_SENSOR_SLOW_STEPS   								1800U    // 이동 시작부/끝부분에서 가속 또는 감속 구간으로 취급할 step 수
+#define STEP_MOTOR_SENSOR_SLOW_STEPS   								2000U    // 이동 시작부/끝부분에서 가속 또는 감속 구간으로 취급할 step 수
 #define STEP_MOTOR_FREQ_TO_DELAY_US(freq_hz) 					(1000000U / (freq_hz)) // 주파수(Hz)를 STEP pulse 주기(us)로 변환
 
 #define STEP_MOTOR_SENSOR_FAST_FREQ_HZ  							25600U   // 중간 빠른 구간의 STEP 주파수(Hz), 값이 클수록 빠름
 #define STEP_MOTOR_SENSOR_ACCEL_FREQ_HZ 							6400U   // 출발 직후 가속 구간의 STEP 주파수(Hz)
 #define STEP_MOTOR_SENSOR_DECEL_FREQ_HZ 							6400U   // 센서 도착 직전 감속 구간의 STEP 주파수(Hz)
-#define STEP_MOTOR_SENSOR_MID_FREQ_HZ 								12800U   // 가속/감속 중간에 한 단계 더 거쳐가는 STEP 주파수(Hz)
+#define STEP_MOTOR_SENSOR_MID_FREQ_HZ 								16000U   // 가속/감속 중간에 한 단계 더 거쳐가는 STEP 주파수(Hz)
 
 #define STEP_MOTOR_SENSOR_FAST_DELAY_US 							STEP_MOTOR_FREQ_TO_DELAY_US(STEP_MOTOR_SENSOR_FAST_FREQ_HZ)   // 빠른 구간 주파수를 timer PWM 주기(us)로 변환한 값
 #define STEP_MOTOR_SENSOR_ACCEL_DELAY_US 							STEP_MOTOR_FREQ_TO_DELAY_US(STEP_MOTOR_SENSOR_ACCEL_FREQ_HZ)  // 가속 구간 주파수를 timer PWM 주기(us)로 변환한 값
@@ -33,17 +33,17 @@
 #define STEP_MOTOR_SENSOR_ACCEL_CHUNK_STEPS 					10U     // 가속 구간에서 한 번에 timer PWM으로 출력할 step 묶음 크기
 #define STEP_MOTOR_SENSOR_DECEL_CHUNK_STEPS 					10U      // 감속 구간에서 한 번에 timer PWM으로 출력할 step 묶음 크기, 작을수록 센서 정지 반응이 촘촘함
 
+#define STEP_MOTOR_FULL_MOVE_STEPS 										20000U   // Zero 기준점에서 Full 위치까지의 목표 좌표 step 수
+
 #define STEP_MOTOR_CALIBRATION_FREQ_HZ 								12800U    // Calibration 중 End/Home 센서를 찾을 때 사용할 고정 STEP 주파수(Hz)
 #define STEP_MOTOR_CALIBRATION_DELAY_US 							STEP_MOTOR_FREQ_TO_DELAY_US(STEP_MOTOR_CALIBRATION_FREQ_HZ) // Calibration 주파수를 timer PWM 주기(us)로 변환한 값
 #define STEP_MOTOR_CALIBRATION_CHUNK_STEPS 						1U      // Calibration 중 한 번에 timer PWM으로 출력할 step 묶음 크기
-#define STEP_MOTOR_CALIBRATION_READY_OFFSET_STEPS 		1000U     // Calibration 마지막에 Home 센서에서 End 방향으로 더 이동할 준비 위치 offset step
 
 typedef enum
 {
   STEP_MOTOR_CALIBRATION_PHASE_NONE = 0,
   STEP_MOTOR_CALIBRATION_PHASE_TO_END,
   STEP_MOTOR_CALIBRATION_PHASE_TO_HOME,
-  STEP_MOTOR_CALIBRATION_PHASE_READY_OFFSET,
 } step_motor_calibration_phase_t;
 
 #define STEP_MOTOR_HOME_DIR            (-1)
@@ -51,6 +51,7 @@ typedef enum
 
 #define STEP_MOTOR_HOME_SENSOR_EVT     APP_EVT_SN04_1_DETECTED
 #define STEP_MOTOR_END_SENSOR_EVT      APP_EVT_SN04_2_DETECTED
+#define STEP_MOTOR_ANY_SENSOR_EVT      (STEP_MOTOR_HOME_SENSOR_EVT | STEP_MOTOR_END_SENSOR_EVT)
 
 static osMessageQueueId_t step_motor_msg_q = NULL;
 static osMessageQueueId_t step_motor_ack_q = NULL;
@@ -71,6 +72,7 @@ static void taskStepMotorDm542DoneIsr(uint8_t ch);
 
 #ifdef _USE_SN04
 static bool taskStepMotorIsTargetDetected(uint32_t target_evt);
+static uint32_t taskStepMotorGetDetectedSensorEvt(void);
 #endif
 
 bool taskStepMotorInit(void)
@@ -129,6 +131,30 @@ bool taskStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us, ui
   msg.ch             = ch;
   msg.step           = step;
   msg.pulse_delay_us = pulse_delay_us;
+
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
+}
+
+bool taskStepMotorMoveToZero(uint32_t *p_cmd_id)
+{
+  rtos_step_motor_msg_t msg;
+
+  msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_ZERO;
+  msg.ch             = _DEF_DM542_1;
+  msg.step           = 0;
+  msg.pulse_delay_us = STEP_MOTOR_SENSOR_FAST_DELAY_US;
+
+  return taskStepMotorPutMsg(&msg, p_cmd_id, true);
+}
+
+bool taskStepMotorMoveToFull(uint32_t *p_cmd_id)
+{
+  rtos_step_motor_msg_t msg;
+
+  msg.cmd            = RTOS_STEP_MOTOR_CMD_MOVE_TO_FULL;
+  msg.ch             = _DEF_DM542_1;
+  msg.step           = STEP_MOTOR_END_DIR * (int32_t)STEP_MOTOR_FULL_MOVE_STEPS;
+  msg.pulse_delay_us = STEP_MOTOR_SENSOR_FAST_DELAY_US;
 
   return taskStepMotorPutMsg(&msg, p_cmd_id, true);
 }
@@ -294,6 +320,34 @@ static void threadStepMotor(void *argument)
           }
           break;
 
+        case RTOS_STEP_MOTOR_CMD_MOVE_TO_ZERO:
+        case RTOS_STEP_MOTOR_CMD_MOVE_TO_FULL:
+        {
+          dm542_data_t motor_data;
+          int32_t target_position_step = msg.step;
+
+          // Zero/Full 이동은 센서를 보지 않고 현재 소프트웨어 위치에서 목표 좌표까지 필요한 차이만 이동한다.
+          if(dm542ReadData(move_ch, &motor_data) != true)
+          {
+            move_remain_step = 0;
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+            has_active_msg = false;
+            break;
+          }
+
+          target_evt = 0U;
+          is_target_move = true;
+          use_sensor_profile = true;
+          move_remain_step = target_position_step - motor_data.position_step;
+          move_profile_step = taskStepMotorAbsStep(move_remain_step);
+          if(move_remain_step == 0)
+          {
+            taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+            has_active_msg = false;
+          }
+          break;
+        }
+
         case RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME:
 #ifdef _USE_SN04
           target_evt = STEP_MOTOR_HOME_SENSOR_EVT;
@@ -354,7 +408,7 @@ static void threadStepMotor(void *argument)
 
         case RTOS_STEP_MOTOR_CMD_CALIBRATION:
 #ifdef _USE_SN04
-          // Calibration은 기존 MoveToEnd/MoveToHome 프로파일을 쓰지 않고 고정 속도로 End -> Home -> 준비 위치 순서로 이동한다.
+          // Calibration은 기존 MoveToEnd/MoveToHome 프로파일을 쓰지 않고 고정 속도로 End -> Home 순서로 이동한다.
           target_evt = STEP_MOTOR_END_SENSOR_EVT;
           is_target_move = true;
           use_sensor_profile = false;
@@ -397,7 +451,9 @@ static void threadStepMotor(void *argument)
     }
 
 #ifdef _USE_SN04
-    if((has_active_msg == true) && (target_evt != 0U) && (taskStepMotorIsTargetDetected(target_evt) == true))
+    uint32_t detected_sensor_evt = taskStepMotorGetDetectedSensorEvt();
+
+    if((has_active_msg == true) && (detected_sensor_evt != 0U))
     {
       if(is_async_chunk_running == true)
       {
@@ -405,6 +461,18 @@ static void threadStepMotor(void *argument)
         taskStepMotorStopCurrent(move_ch);
         is_async_chunk_running = false;
         async_chunk_step = 0;
+      }
+
+      if((target_evt == 0U) || ((detected_sensor_evt & target_evt) == 0U))
+      {
+        // 목표 센서 이동이 아니거나 목표가 아닌 센서가 감지되면 안전 정지로 처리한다.
+        move_remain_step = 0;
+        taskStepMotorStopCurrent(move_ch);
+        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_ERROR);
+        calibration_phase = STEP_MOTOR_CALIBRATION_PHASE_NONE;
+        has_active_msg = false;
+        osDelay(STEP_MOTOR_IDLE_MS);
+        continue;
       }
 
       if((active_msg.cmd == RTOS_STEP_MOTOR_CMD_CALIBRATION) &&
@@ -425,15 +493,12 @@ static void threadStepMotor(void *argument)
       if((active_msg.cmd == RTOS_STEP_MOTOR_CMD_CALIBRATION) &&
          (calibration_phase == STEP_MOTOR_CALIBRATION_PHASE_TO_HOME))
       {
-        // Calibration은 Home 센서를 찾은 뒤 준비 위치로 빠지기 위해 End 방향으로 500step 더 이동한다.
-        target_evt = 0U;
-        calibration_phase = STEP_MOTOR_CALIBRATION_PHASE_READY_OFFSET;
-        use_sensor_profile = false;
-        move_pulse_delay_us = STEP_MOTOR_CALIBRATION_DELAY_US;
-        move_done_step = 0U;
-        move_profile_step = STEP_MOTOR_CALIBRATION_READY_OFFSET_STEPS;
-        move_remain_step = STEP_MOTOR_END_DIR * (int32_t)STEP_MOTOR_CALIBRATION_READY_OFFSET_STEPS;
-        (void)appEventClear(APP_EVT_STEP_MOTOR_DONE);
+        // 모든 이동에서 센서 감지를 안전 정지로 쓰기 때문에 Home 센서 감지 위치를 Zero 기준점으로 잡고 종료한다.
+        move_remain_step = 0;
+        (void)dm542SetPositionStep(move_ch, 0);
+        taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
+        calibration_phase = STEP_MOTOR_CALIBRATION_PHASE_NONE;
+        has_active_msg = false;
         osDelay(STEP_MOTOR_IDLE_MS);
         continue;
       }
@@ -460,8 +525,8 @@ static void threadStepMotor(void *argument)
         {
           uint32_t evt_flags;
 
-          // PWM count 완료 또는 목표 센서 감지 이벤트가 올 때까지 task를 잠시 block한다.
-          evt_flags = appEventWait(APP_EVT_STEP_MOTOR_DONE | target_evt,
+          // PWM count 완료 또는 SN04 센서 감지 이벤트가 올 때까지 task를 잠시 block한다.
+          evt_flags = appEventWait(APP_EVT_STEP_MOTOR_DONE | STEP_MOTOR_ANY_SENSOR_EVT,
                                    osFlagsWaitAny | osFlagsNoClear,
                                    STEP_MOTOR_IDLE_MS);
 
@@ -481,10 +546,9 @@ static void threadStepMotor(void *argument)
 
             if(move_remain_step == 0)
             {
-              if((active_msg.cmd == RTOS_STEP_MOTOR_CMD_CALIBRATION) &&
-                 (calibration_phase == STEP_MOTOR_CALIBRATION_PHASE_READY_OFFSET))
+              if(target_evt == 0U)
               {
-                // Calibration 마지막 offset 이동은 센서 감지가 아니라 500step 완료가 정상 종료 조건이다.
+                // Zero/Full 고정 이동은 step 완료가 정상 종료 조건이다.
                 taskStepMotorSendAck(&active_msg, RTOS_STEP_MOTOR_ACK_DONE);
                 calibration_phase = STEP_MOTOR_CALIBRATION_PHASE_NONE;
               }
@@ -533,8 +597,6 @@ static void threadStepMotor(void *argument)
 
           if(dm542MoveStepAsync(move_ch, step, pulse_delay_us) == true)
           {
-            // Home/End 센서를 찾는 phase에서만 SN04 EXTI가 DM542 PWM을 즉시 끊을 수 있게 허용한다.
-            (void)dm542EnableSensorStop(move_ch, target_evt != 0U);
             async_chunk_step = step;
             is_async_chunk_running = true;
           }
@@ -746,5 +808,22 @@ static bool taskStepMotorIsTargetDetected(uint32_t target_evt)
     default:
       return false;
   }
+}
+
+static uint32_t taskStepMotorGetDetectedSensorEvt(void)
+{
+  uint32_t evt_flags = appEventGet() & STEP_MOTOR_ANY_SENSOR_EVT;
+
+  if(sn04IsDetected(_DEF_SN04_1) == true)
+  {
+    evt_flags |= STEP_MOTOR_HOME_SENSOR_EVT;
+  }
+
+  if(sn04IsDetected(_DEF_SN04_2) == true)
+  {
+    evt_flags |= STEP_MOTOR_END_SENSOR_EVT;
+  }
+
+  return evt_flags;
 }
 #endif

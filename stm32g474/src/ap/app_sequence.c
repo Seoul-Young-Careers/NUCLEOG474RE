@@ -30,10 +30,6 @@
 #define SERVO_WAIT_MS               				  500U
 #define SERVO_PUT_SETTLE_DELAY_MS      		    300U
 
-#define STEP_MOTOR_READY_OFFSET_STEPS     	  500
-#define STEP_MOTOR_START_OFFSET_STEPS				  -300
-#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US    100U
-
 typedef enum
 {
   APP_SEQUENCE_WAIT_DONE = 0,
@@ -196,7 +192,7 @@ static bool runStopSequence(void)
     return false;
   }
 
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  if(taskStepMotorMoveToZero(&cmd_id) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;
@@ -267,35 +263,7 @@ static bool runStartSequence(void)
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_END);
 
-  if(taskStepMotorMoveToEnd(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-
-  if(wait_result == APP_SEQUENCE_WAIT_RESET)
-  {
-    return runResetSequence();
-  }
-
-  if(wait_result == APP_SEQUENCE_WAIT_STOP)
-  {
-    (void)appEventClear(APP_EVT_STOP_REQ);
-    return runStopSequence();
-  }
-
-  if(wait_result != APP_SEQUENCE_WAIT_DONE)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  if(taskStepMotorMoveStep(_DEF_DM542_1,
-                           STEP_MOTOR_START_OFFSET_STEPS,
-                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
-                           &cmd_id) != true)
+  if(taskStepMotorMoveToFull(&cmd_id) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;

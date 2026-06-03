@@ -16,6 +16,8 @@ extern "C" {
 
 bool taskStepMotorInit(void);
 bool taskStepMotorMoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us, uint32_t *p_cmd_id);
+bool taskStepMotorMoveToZero(uint32_t *p_cmd_id);
+bool taskStepMotorMoveToFull(uint32_t *p_cmd_id);
 bool taskStepMotorMoveToHome(uint32_t *p_cmd_id);
 bool taskStepMotorMoveToEnd(uint32_t *p_cmd_id);
 bool taskStepMotorCalibration(uint32_t *p_cmd_id);
