@@ -28,6 +28,8 @@ typedef struct
   bool is_busy;
   bool is_count_mode;
   uint32_t remain_count;
+  // count 모드가 끝났을 때 상위 드라이버(DM542)에 완료를 알려준다.
+  pwm_done_callback_t done_cb;
 } pwm_tbl_t;
 
 typedef struct
@@ -47,6 +49,7 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
     .is_busy        = false,
     .is_count_mode  = false,
     .remain_count   = 0,
+    .done_cb        = NULL,
   },
   {
     .p_tim          = &htim3,
@@ -56,12 +59,13 @@ static pwm_tbl_t pwm_tbl[PWM_MAX_CH] =
     .is_busy        = false,
     .is_count_mode  = false,
     .remain_count   = 0,
+    .done_cb        = NULL,
   },
 };
 
 static pwm_cfg_t pwm_cfg[PWM_MAX_CH] =
 {
-	{ 169, 3332, 1500 },									// sub motor
+	{ 169, 3332, 1500 },									// servo motor
   { 79, 999, 5 },												// step motor
 };
 
@@ -79,6 +83,7 @@ bool pwmInit(void)
     pwm_tbl[i].is_busy       = false;
     pwm_tbl[i].is_count_mode = false;
     pwm_tbl[i].remain_count  = 0;
+    pwm_tbl[i].done_cb       = NULL;
   }
 
 #ifdef _USE_HW_CLI
@@ -467,6 +472,7 @@ bool pwmStart(uint8_t ch)
 
   p_tim = pwm_tbl[ch].p_tim;
   __HAL_TIM_SET_COUNTER(p_tim, 0);
+  __HAL_TIM_DISABLE_IT(p_tim, TIM_IT_UPDATE);
 
   if(HAL_TIM_PWM_Start(p_tim, pwm_tbl[ch].channel) != HAL_OK) return false;
 
@@ -484,12 +490,88 @@ bool pwmStop(uint8_t ch)
 
   p_tim = pwm_tbl[ch].p_tim;
 
+  __HAL_TIM_DISABLE_IT(p_tim, TIM_IT_UPDATE);
+
   if(HAL_TIM_PWM_Stop(p_tim, pwm_tbl[ch].channel) != HAL_OK) return false;
 
-  pwm_tbl[ch].is_busy = false;
+  pwm_tbl[ch].is_busy        = false;
+  pwm_tbl[ch].is_count_mode  = false;
+  pwm_tbl[ch].remain_count   = 0U;
 
   return true;
 }
+
+bool pwmStartCount(uint8_t ch, uint32_t count)
+{
+  TIM_HandleTypeDef *p_tim;
+
+  if(ch >= PWM_MAX_CH) return false;
+  if(count == 0U) return false;
+  if(pwm_tbl[ch].is_open != true) return false;
+  if(pwm_tbl[ch].is_busy == true) return false;
+
+  p_tim = pwm_tbl[ch].p_tim;
+
+  // Timer update interrupt마다 remain_count를 1씩 줄여서 PWM 펄스 수를 센다.
+  pwm_tbl[ch].is_count_mode = true;
+  pwm_tbl[ch].remain_count  = count;
+
+  __HAL_TIM_SET_COUNTER(p_tim, 0);
+  __HAL_TIM_CLEAR_FLAG(p_tim, TIM_FLAG_UPDATE);
+
+  if(HAL_TIM_PWM_Start(p_tim, pwm_tbl[ch].channel) != HAL_OK)
+  {
+    pwm_tbl[ch].is_count_mode = false;
+    pwm_tbl[ch].remain_count  = 0U;
+    return false;
+  }
+
+  // PWM 시작 후 update interrupt를 켜야 펄스 카운트가 진행된다.
+  __HAL_TIM_ENABLE_IT(p_tim, TIM_IT_UPDATE);
+
+  pwm_tbl[ch].is_busy = true;
+
+  return true;
+}
+
+bool pwmStopFromISR(uint8_t ch)
+{
+  TIM_HandleTypeDef *p_tim;
+
+  if(ch >= PWM_MAX_CH) return false;
+  if(pwm_tbl[ch].is_open != true) return false;
+
+  p_tim = pwm_tbl[ch].p_tim;
+
+  // ISR에서는 mutex 없이 하드웨어 출력과 count 상태만 즉시 정리한다.
+  __HAL_TIM_DISABLE_IT(p_tim, TIM_IT_UPDATE);
+
+  if(HAL_TIM_PWM_Stop(p_tim, pwm_tbl[ch].channel) != HAL_OK) return false;
+
+  pwm_tbl[ch].is_busy        = false;
+  pwm_tbl[ch].is_count_mode  = false;
+  pwm_tbl[ch].remain_count   = 0U;
+
+  return true;
+}
+
+bool pwmAttachDoneCallback(uint8_t ch, pwm_done_callback_t callback)
+{
+  if(ch >= PWM_MAX_CH) return false;
+
+  // PWM count 완료 시 호출할 사용자 콜백을 저장한다.
+  pwm_tbl[ch].done_cb = callback;
+
+  return true;
+}
+
+uint32_t pwmGetRemainCount(uint8_t ch)
+{
+  if(ch >= PWM_MAX_CH) return 0U;
+
+  return pwm_tbl[ch].remain_count;
+}
+
 bool pwmRunUs(uint8_t ch, uint32_t time_us)
 {
   bool ret;
@@ -625,6 +707,43 @@ bool pwmSetPulse(uint8_t ch, uint32_t pulse)
   __HAL_TIM_SET_COMPARE(p_tim, pwm_tbl[ch].channel, pulse);
 
   return true;
+}
+
+void pwmTimPeriodElapsedCallback(TIM_HandleTypeDef *p_tim)
+{
+  if(p_tim == NULL) return;
+
+  // HAL_TIM_PeriodElapsedCallback()에서 들어온 timer가 어떤 PWM 채널인지 찾는다.
+  for(uint8_t i = 0; i < PWM_MAX_CH; i++)
+  {
+    pwm_done_callback_t done_cb;
+
+    if(pwm_tbl[i].p_tim != p_tim) continue;
+    if(pwm_tbl[i].is_busy != true) continue;
+    if(pwm_tbl[i].is_count_mode != true) continue;
+
+    if(pwm_tbl[i].remain_count > 0U)
+    {
+      // PWM 한 주기를 STEP pulse 1개로 보고 남은 count를 줄인다.
+      pwm_tbl[i].remain_count--;
+    }
+
+    if(pwm_tbl[i].remain_count != 0U)
+    {
+      break;
+    }
+
+    (void)pwmStopFromISR(i);
+
+    // count가 0이 되면 PWM을 멈추고 등록된 완료 콜백을 호출한다.
+    done_cb = pwm_tbl[i].done_cb;
+    if(done_cb != NULL)
+    {
+      done_cb(i);
+    }
+
+    break;
+  }
 }
 
 

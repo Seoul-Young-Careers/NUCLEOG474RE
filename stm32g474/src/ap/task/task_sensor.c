@@ -20,7 +20,7 @@ static void sensorSn04IsrHandler(uint8_t ch, bool detected);
 bool taskSensorInit(void)
 {
 #ifdef _USE_SN04
-  (void)sn04SetIsrCallback(sensorSn04IsrHandler);
+  (void)sn04AttachCallback(sensorSn04IsrHandler);
 #endif
 
   return osThreadNew(threadSensor, NULL, rtosGetSensorThreadAttr()) != NULL;
@@ -83,6 +83,8 @@ static void sensorSn04IsrHandler(uint8_t ch, bool detected)
 
   if(detected == true)
   {
+    // 센서 타겟 이동 중이면 SN04 EXTI에서 STEP PWM을 즉시 정지한다.
+    (void)dm542StopBySensorFromISR(_DEF_DM542_1);
     (void)appEventSet(evt_bit);
   }
   else

@@ -7,6 +7,7 @@
 
 #include "rtos.h"
 #include "bsp.h"
+#include "pwm.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -258,6 +259,9 @@ void HAL_ResumeTick(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+  // TIM2/TIM3 PWM count 완료 처리를 공통 timer callback에서 먼저 분배한다.
+  pwmTimPeriodElapsedCallback(htim);
+
   if (htim->Instance == TIM7)
   {
     HAL_IncTick();

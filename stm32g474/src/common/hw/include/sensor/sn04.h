@@ -25,7 +25,8 @@ typedef struct
   bool is_detected;
 } sn04_data_t;
 
-typedef void (*sn04_isr_cb_t)(uint8_t ch, bool detected);
+// SN04 감지 상태가 바뀌었을 때 호출되는 콜백 타입
+typedef void (*sn04_callback_t)(uint8_t ch, bool detected);
 
 bool sn04Init(void);
 bool sn04IsReady(uint8_t ch);
@@ -34,7 +35,7 @@ bool sn04Read(uint8_t ch);
 bool sn04IsDetected(uint8_t ch);
 bool sn04ReadData(uint8_t ch, sn04_data_t *p_data);
 
-bool sn04SetIsrCallback(sn04_isr_cb_t cb);
+bool sn04AttachCallback(sn04_callback_t callback);
 
 #endif
 

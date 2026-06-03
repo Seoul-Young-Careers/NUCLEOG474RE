@@ -49,7 +49,7 @@ static const IRQn_Type sn04_irq_tbl[SN04_MAX_CH] =
 #define SN04_EXTI_IRQ_PRIO   5U
 
 static sn04_tbl_t sn04_tbl[SN04_MAX_CH];
-static volatile sn04_isr_cb_t sn04_isr_cb = NULL;
+static volatile sn04_callback_t sn04_callback = NULL;
 
 static bool sn04Lock(void);
 static void sn04Unlock(void);
@@ -153,9 +153,9 @@ bool sn04IsDetected(uint8_t ch)
   return sn04Read(ch);
 }
 
-bool sn04SetIsrCallback(sn04_isr_cb_t cb)
+bool sn04AttachCallback(sn04_callback_t callback)
 {
-  sn04_isr_cb = cb;
+  sn04_callback = callback;
   return true;
 }
 
@@ -170,10 +170,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
     sn04_tbl[i].is_detected = detected;
 
-    sn04_isr_cb_t cb = sn04_isr_cb;
-    if(cb != NULL)
+    sn04_callback_t callback = sn04_callback;
+    if(callback != NULL)
     {
-      cb((uint8_t)i, detected);
+      callback((uint8_t)i, detected);
     }
     break;
   }

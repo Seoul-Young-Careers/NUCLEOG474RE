@@ -27,6 +27,9 @@ typedef enum
   TIM_PWM_ACTIVE_LOW,
 } tim_pwm_active_t;
 
+// 지정한 PWM 펄스 수가 모두 출력됐을 때 호출되는 콜백 타입
+typedef void (*pwm_done_callback_t)(uint8_t ch);
+
 bool pwmInit(void);                                                    // TIM PWM driver init
 bool pwmOpen(uint8_t ch);                                              // Open selected PWM channel
 
@@ -35,12 +38,17 @@ bool pwmIsBusy(uint8_t ch);                                            // Check 
 
 bool pwmStart(uint8_t ch);                                             // Start PWM output
 bool pwmStop(uint8_t ch);                                              // Stop PWM output
+bool pwmStartCount(uint8_t ch, uint32_t count);                        // 지정한 펄스 수만큼 PWM 출력 시작
+bool pwmStopFromISR(uint8_t ch);                                       // 인터럽트 안에서 PWM 출력 정지
+bool pwmAttachDoneCallback(uint8_t ch, pwm_done_callback_t callback);  // 지정 펄스 출력 완료 콜백 등록
+uint32_t pwmGetRemainCount(uint8_t ch);                                // 아직 출력되지 않은 남은 펄스 수 읽기
 bool pwmRunUs(uint8_t ch, uint32_t time_us);
 
 bool pwmSetGpioMode(uint8_t ch, uint32_t mode);                        // Configure PWM GPIO alternate function
 bool pwmSetPrescaler(uint8_t ch, uint32_t prescaler);                  // Apply channel prescaler
 bool pwmSetPeriod(uint8_t ch, uint32_t period);                        // Apply channel period
 bool pwmSetPulse(uint8_t ch, uint32_t pulse);                          // Apply channel pulse width
+void pwmTimPeriodElapsedCallback(TIM_HandleTypeDef *p_tim);            // TIM update 인터럽트를 PWM count 처리로 전달
 
 #endif
 

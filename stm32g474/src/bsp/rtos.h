@@ -17,6 +17,8 @@
 #define APP_EVT_FOOT_PRESS       (1U << 3)
 #define APP_EVT_SN04_1_DETECTED  (1U << 4)
 #define APP_EVT_SN04_2_DETECTED  (1U << 5)
+// DM542 비동기 STEP 출력이 지정 count만큼 끝났음을 알리는 이벤트
+#define APP_EVT_STEP_MOTOR_DONE  (1U << 6)
 
 typedef enum
 {
@@ -24,6 +26,7 @@ typedef enum
   RTOS_STEP_MOTOR_CMD_MOVE_STEP,
   RTOS_STEP_MOTOR_CMD_MOVE_TO_HOME,
   RTOS_STEP_MOTOR_CMD_MOVE_TO_END,
+  RTOS_STEP_MOTOR_CMD_CALIBRATION,
   RTOS_STEP_MOTOR_CMD_STOP,
 } rtos_step_motor_cmd_t;
 

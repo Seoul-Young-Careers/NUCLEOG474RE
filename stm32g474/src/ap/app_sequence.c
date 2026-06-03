@@ -17,23 +17,22 @@
 #define CONTROL_EVT                 (APP_EVT_RESET_REQ | APP_EVT_STOP_REQ | APP_EVT_START_REQ | APP_EVT_FOOT_PRESS)
 #define ACK_WAIT_MS                 10U
 
-#define SERVO_CH                    _DEF_DS3120MG1
-#define VALVE1_CH                   _DEF_2V025_1
-#define VALVE2_CH                   _DEF_2V025_2
+#define SERVO_CH                              _DEF_DS3120MG1
+#define VALVE1_CH                             _DEF_2V025_1
+#define VALVE2_CH                             _DEF_2V025_2
 
-#define SERVO_BOOT_ANGLE_DEG        			180.0f
-#define SERVO_HOME_ANGLE_DEG        			170.0f
-#define SERVO_START_GRAB_BAG_ANGLE_DEG		20.0f
-#define SERVO_START_PUT_BAG_ANGLE_DEG     60.0f
-#define SERVO_START_OPEN_BAG_ANGLE_DEG		170.0f
-#define SERVO_HOLD_ANGLE_DEG        			120.0f
+#define SERVO_HOME_ANGLE_DEG        			    180.0f    
+#define SERVO_START_GRAB_BAG_ANGLE_DEG		    20.0f
+#define SERVO_START_PUT_BAG_ANGLE_DEG         60.0f
+#define SERVO_START_OPEN_BAG_ANGLE_DEG		    170.0f
+#define SERVO_HOLD_ANGLE_DEG        			    120.0f
 
-#define SERVO_WAIT_MS               				500U
-#define SERVO_PUT_SETTLE_DELAY_MS      		300U
+#define SERVO_WAIT_MS               				  500U
+#define SERVO_PUT_SETTLE_DELAY_MS      		    300U
 
-#define STEP_MOTOR_READY_OFFSET_STEPS     	500
-#define STEP_MOTOR_START_OFFSET_STEPS				-300
-#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US 100U
+#define STEP_MOTOR_READY_OFFSET_STEPS     	  500
+#define STEP_MOTOR_START_OFFSET_STEPS				  -300
+#define STEP_MOTOR_SEQUENCE_PULSE_DELAY_US    100U
 
 typedef enum
 {
@@ -69,7 +68,7 @@ static void setState(app_sequence_state_t state);								// 현재 시퀀스 상
 // 부팅 시 장비 위치를 보정한 뒤 서보를 부팅 전용 초기 각도로 보낸다.
 bool sequenceInit(void)
 {
-	servoMoveAndWait(SERVO_BOOT_ANGLE_DEG);
+	servoMoveAndWait(SERVO_HOME_ANGLE_DEG);
 
   return runResetSequence();
 }
@@ -159,55 +158,15 @@ static bool runResetSequence(void)
   (void)appEventClear(CONTROL_EVT);
   stopAllActuators();
 
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  // RESET 시에는 End 센서까지 갔다가 Home 센서까지 돌아오는 Calibration 명령 하나만 수행한다.
+  if(taskStepMotorCalibration(&cmd_id) != true)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
     return false;
   }
 
   wait_result = waitStepMotor(cmd_id);
-  if(wait_result != APP_SEQUENCE_WAIT_DONE)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
 
-  if(taskStepMotorMoveToEnd(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-  if(wait_result != APP_SEQUENCE_WAIT_DONE)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
-  if(wait_result != APP_SEQUENCE_WAIT_DONE)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  if(taskStepMotorMoveStep(_DEF_DM542_1,
-                           STEP_MOTOR_READY_OFFSET_STEPS,
-                           STEP_MOTOR_SEQUENCE_PULSE_DELAY_US,
-                           &cmd_id) != true)
-  {
-    setState(APP_SEQUENCE_STATE_ERROR);
-    return false;
-  }
-
-  wait_result = waitStepMotor(cmd_id);
   if(wait_result != APP_SEQUENCE_WAIT_DONE)
   {
     setState(APP_SEQUENCE_STATE_ERROR);
@@ -449,7 +408,8 @@ static void stopAllActuators(void)
 #ifdef _USE_2V025
   for(uint8_t i = 0; i < V025_MAX_CH; i++)
   {
-    (void)taskValveClose(i);
+    // 부팅/reset 초기 정리에서는 발열을 막기 위해 V025 코일을 강제로 OFF 상태로 둔다.
+    (void)taskValveSet(i, false);
   }
 #endif
 }
