@@ -20,9 +20,9 @@
 #define STEP_MOTOR_SENSOR_SLOW_FREQ_HZ        6400     // 출발/도착 근처 slow 구간 STEP 주파수
 #define STEP_MOTOR_CALIBRATION_FREQ_HZ        12800    // Calibration 센서 탐색 STEP 주파수
 
-#define STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS    50       // fast 구간에서 한 번에 출력할 step 수
+#define STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS    100       // fast 구간에서 한 번에 출력할 step 수
 #define STEP_MOTOR_SENSOR_SLOW_CHUNK_STEPS    10       // slow/mid 구간에서 한 번에 출력할 step 수
-#define STEP_MOTOR_CALIBRATION_CHUNK_STEPS    1        // Calibration에서 한 번에 출력할 step 수
+#define STEP_MOTOR_CALIBRATION_CHUNK_STEPS    50        // Calibration에서 한 번에 출력할 step 수
 
 #define STEP_MOTOR_FREQ_TO_DELAY_US(freq_hz)  (1000000 / (freq_hz))
 
