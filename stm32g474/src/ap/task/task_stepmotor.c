@@ -11,16 +11,16 @@
 
 #define STEP_MOTOR_IDLE_MS                    1        // step motor task가 할 일이 없을 때 쉬는 시간
 
-#define STEP_MOTOR_MOVE_MAX_STEPS             33000    // 센서 탐색 시 안전상 허용하는 최대 이동 step
+#define STEP_MOTOR_MOVE_MAX_STEPS             27600    // 센서 탐색 시 안전상 허용하는 최대 이동 step
 #define STEP_MOTOR_SENSOR_SLOW_STEPS          2000     // 시작/끝부분을 slow+mid 구간으로 보는 step 수
 #define STEP_MOTOR_FULL_MOVE_STEPS            20000    // Zero <-> Full 이동에 넣을 고정 pulse 수
 
-#define STEP_MOTOR_SENSOR_FAST_FREQ_HZ        25600    // 중간 빠른 구간 STEP 주파수
+#define STEP_MOTOR_SENSOR_FAST_FREQ_HZ        20000    // 중간 빠른 구간 STEP 주파수
 #define STEP_MOTOR_SENSOR_MID_FREQ_HZ         16000    // slow와 fast 사이 중간 구간 STEP 주파수
 #define STEP_MOTOR_SENSOR_SLOW_FREQ_HZ        6400     // 출발/도착 근처 slow 구간 STEP 주파수
 #define STEP_MOTOR_CALIBRATION_FREQ_HZ        12800    // Calibration 센서 탐색 STEP 주파수
 
-#define STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS    100       // fast 구간에서 한 번에 출력할 step 수
+#define STEP_MOTOR_SENSOR_FAST_CHUNK_STEPS    50       // fast 구간에서 한 번에 출력할 step 수
 #define STEP_MOTOR_SENSOR_SLOW_CHUNK_STEPS    10       // slow/mid 구간에서 한 번에 출력할 step 수
 #define STEP_MOTOR_CALIBRATION_CHUNK_STEPS    50        // Calibration에서 한 번에 출력할 step 수
 

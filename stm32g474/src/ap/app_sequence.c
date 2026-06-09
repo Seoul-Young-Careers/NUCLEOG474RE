@@ -22,7 +22,7 @@
 #define VALVE2_CH                             _DEF_2V025_2
 
 #define SERVO_HOME_ANGLE_DEG        			    180.0f    
-#define SERVO_START_GRAB_BAG_ANGLE_DEG		    	20.0f
+#define SERVO_START_GRAB_BAG_ANGLE_DEG		    	17.0f
 #define SERVO_START_PUT_BAG_ANGLE_DEG         		60.0f
 #define SERVO_START_OPEN_BAG_ANGLE_DEG		    	170.0f
 #define SERVO_HOLD_ANGLE_DEG        			    120.0f
@@ -248,7 +248,7 @@ static bool runStartSequence(void)
   {
     return false;
   }
-
+  delay(200);
   if(servoMoveAndWait(SERVO_START_GRAB_BAG_ANGLE_DEG) != true)
   {
     return false;
