@@ -1,203 +1,292 @@
 # NUCLEOG474RE
 
-STM32G474 NUCLEO 보드 기반 모터 제어 실험 프로젝트입니다.
+STM32G474 NUCLEO 보드 기반 자동화 장비 제어 펌웨어입니다. RTOS task를 이용해 버튼 입력, SN04 limit 센서, DM542 스텝모터, 서보모터, 펌프, 밸브를 분리해서 제어합니다.
 
-현재 정리된 주요 흐름은 `PWM` 드라이버를 이용해서 DM542 스텝모터 드라이버의 `PUL` 신호를 만들고, `GPIO` 드라이버로 `DIR` 방향 신호를 제어하는 구조입니다. `ENA`는 소프트웨어 GPIO 제어 대상에서 제외하고 하드웨어 쪽에서 처리하는 방향으로 잡았습니다.
+현재 소프트웨어 구조의 핵심은 다음과 같습니다.
 
-## 현재 구조
+- 버튼 입력을 RTOS event로 변환
+- 장비 동작은 `app_sequence.c`의 상태 기반 시퀀스로 처리
+- DM542 스텝모터는 async chunk 단위로 pulse 출력
+- SN04 센서는 limit 안전 정지와 Home/End 기준 검출에 사용
+- 에러 발생 시 전체 구동부를 안전 상태로 정리하고 `ERROR` 상태로 고정
+
+## 주요 목표
+
+장비 동작 시간 기준은 11.33초/팩입니다. 이를 만족시키기 위해 스텝모터를 긴 blocking 이동으로 처리하지 않고, 짧은 chunk 단위의 비동기 pulse 출력으로 구성했습니다. 이동 중에도 센서 감지, STOP, RESET 요청을 계속 확인할 수 있도록 RTOS event와 ACK 구조를 사용합니다.
+
+## 전체 구조
 
 ```text
-Application
-  |
-  +-- dm542.c
-        |
-        +-- pwm.c     : DM542 PUL 펄스 출력
-        +-- gpio.c    : DM542 DIR 방향 출력
-        +-- bsp.c     : us 단위 delay
+Button Task
+  -> APP_EVT_RESET_REQ / STOP_REQ / START_REQ / FOOT_PRESS
+
+Sensor Task / SN04 ISR
+  -> APP_EVT_SN04_1_DETECTED / APP_EVT_SN04_2_DETECTED
+  -> DM542 sensor stop
+
+Sequence
+  -> RESET / STOP / START / FOOT 시퀀스 실행
+  -> StepMotor task에 명령 전송
+  -> ACK 대기 및 에러 처리
+
+StepMotor Task
+  -> DM542 async chunk 이동
+  -> SN04 limit 정책 적용
+  -> ACK_DONE / ACK_STOPPED / ACK_ERROR 반환
 ```
 
-## 파일 구성
+## 주요 파일
 
 | 파일 | 역할 |
 | --- | --- |
-| `stm32g474/src/hw/driver/pwm.c` | TIM PWM 채널 초기화, 설정, 출력 제어 |
-| `stm32g474/src/common/hw/include/pwm.h` | PWM 공개 API |
-| `stm32g474/src/bsp/bsp.c` | `delay()`, `delayUs()` 구현 |
-| `stm32g474/src/bsp/bsp.h` | BSP delay API 선언 |
-| `stm32g474/src/hw/driver/dm542/dm542.c` | DM542 모터 드라이버 API 구현 |
-| `stm32g474/src/common/hw/include/dm542/dm542.h` | DM542 공개 API |
-| `stm32g474/src/hw/hw_def.h` | 사용 모듈 및 채널 수 설정 |
+| `stm32g474/src/ap/app_sequence.c` | 장비 상태와 RESET/STOP/START/FOOT 시퀀스 처리 |
+| `stm32g474/src/ap/app_sequence.h` | 장비 시퀀스 상태 enum 및 public API |
+| `stm32g474/src/ap/task/task_button.c` | 버튼 디바운싱 및 버튼 이벤트 발생 |
+| `stm32g474/src/ap/task/task_sensor.c` | SN04 센서 감지, sensor event 관리, DM542 즉시 정지 |
+| `stm32g474/src/ap/task/task_stepmotor.c` | DM542 스텝모터 명령 큐, async chunk 이동, SN04 limit 처리 |
+| `stm32g474/src/ap/task/task_stepmotor.h` | StepMotor task public API |
+| `stm32g474/src/bsp/rtos.h` | RTOS event bit, step motor command, ACK 구조체 정의 |
+| `stm32g474/src/hw/driver/stepmotor/dm542.c` | DM542 low-level pulse, direction, async 이동 구현 |
+| `stm32g474/src/hw/driver/sensor/sn04.c` | SN04 센서 GPIO/EXTI 처리 |
 
-## PWM 드라이버
+## 버튼 동작
 
-PWM은 채널 기반으로 동작합니다. GPIO 관련 설정은 PWM 테이블에서 분리했고, 타이머 핸들러와 TIM 채널 중심으로 구성했습니다.
+버튼은 10ms 주기로 읽고, 같은 상태가 3회 연속 유지되면 눌림으로 인정합니다. 즉 약 30ms 디바운싱 후 눌림 edge에서 한 번만 event가 발생합니다.
 
-주요 API:
+| 버튼 | GPIO | Event | 동작 조건 | 동작 |
+| --- | --- | --- | --- | --- |
+| RESET | PC5 | `APP_EVT_RESET_REQ` | 모든 상태 | 전체 구동부 정지 후 Calibration |
+| STOP | PC4 | `APP_EVT_STOP_REQ` | START 이후 동작 상태 | 펌프/밸브 정리, 서보 Home, 스텝모터 Zero 이동 |
+| START | PA10 | `APP_EVT_START_REQ` | `IDLE_HOME` 상태 | 작업 시작 시퀀스 실행 |
+| FOOT SWITCH | PB3 | `APP_EVT_FOOT_PRESS` | `READY_SEQUENCE` 상태 | STOP 시퀀스 후 START 시퀀스 반복 |
 
-```c
-bool pwmInit(void);
-bool pwmOpen(uint8_t ch);
-bool pwmIsOpen(uint8_t ch);
-bool pwmIsBusy(uint8_t ch);
-
-bool pwmStart(uint8_t ch);
-bool pwmStop(uint8_t ch);
-bool pwmRunUs(uint8_t ch, uint32_t time_us);
-
-bool pwmSetPrescaler(uint8_t ch, uint32_t prescaler);
-bool pwmSetPeriod(uint8_t ch, uint32_t period);
-bool pwmSetPulse(uint8_t ch, uint32_t pulse);
-```
-
-`pwmRunUs()`는 PWM을 켠 뒤 지정한 us 시간만큼 기다리고 다시 끄는 함수입니다.
+## 장비 상태
 
 ```c
-pwmRunUs(_DEF_PWM2, 10);
+APP_SEQUENCE_STATE_BOOT
+APP_SEQUENCE_STATE_HOMING
+APP_SEQUENCE_STATE_IDLE_HOME
+APP_SEQUENCE_STATE_START_ACTION
+APP_SEQUENCE_STATE_MOVING_TO_END
+APP_SEQUENCE_STATE_END_ACTION
+APP_SEQUENCE_STATE_READY_SEQUENCE
+APP_SEQUENCE_STATE_RUNNING_SEQUENCE
+APP_SEQUENCE_STATE_MOVING_TO_HOME
+APP_SEQUENCE_STATE_ERROR
 ```
 
-위 코드는 `_DEF_PWM2` 채널 PWM을 약 10us 동안 출력한 뒤 정지합니다.
-
-## BSP delayUs
-
-us 단위 지연은 PWM 내부에 두지 않고 BSP 공통 함수로 분리했습니다.
-
-```c
-void delayUs(uint32_t us);
-```
-
-현재 `delayUs()`는 DWT cycle counter를 사용합니다. PWM의 `pwmRunUs()`와 DM542의 step pulse 출력에서 사용합니다.
-
-## DM542 드라이버
-
-DM542는 현재 다음 신호 기준으로 구성했습니다.
-
-| DM542 신호 | 처리 방식 |
-| --- | --- |
-| `PUL` | PWM 출력 |
-| `DIR` | GPIO 출력 |
-| `ENA` | 하드웨어 처리, 소프트웨어 GPIO 제어 없음 |
-
-현재 매크로:
-
-```c
-#define DM542_MAX_CH    HW_DM542_MAX
-#define DM542_PUL       _DEF_PWM2
-#define DM542_DIR       0
-```
-
-`DM542_PUL`은 PWM 채널을 의미하고, `DM542_DIR`은 GPIO 채널을 의미합니다.
-
-## DM542 API
-
-초기화 및 상태 확인:
-
-```c
-bool dm542Init(void);
-bool dm542Open(uint8_t ch);
-
-bool dm542IsOpen(uint8_t ch);
-bool dm542IsBusy(uint8_t ch);
-bool dm542IsEnabled(uint8_t ch);
-```
-
-Enable 상태 제어:
-
-```c
-bool dm542Enable(uint8_t ch);
-bool dm542Disable(uint8_t ch);
-```
-
-현재 `enable/disable`은 외부 ENA 핀을 직접 제어하지 않고, DM542 API 내부에서 동작 허용 여부를 판단하는 소프트웨어 상태값입니다.
-
-PWM 및 step 제어:
-
-```c
-bool dm542Start(uint8_t ch);
-bool dm542Stop(uint8_t ch);
-bool dm542Step(uint8_t ch);
-
-bool dm542SetPrescaler(uint8_t ch, uint32_t prescaler);
-bool dm542SetPeriod(uint8_t ch, uint32_t period);
-bool dm542SetPulse(uint8_t ch, uint32_t pulse);
-bool dm542SetFreq(uint8_t ch, uint32_t freq_hz);
-```
-
-이동 제어:
-
-```c
-bool dm542MoveStep(uint8_t ch, int32_t step, uint32_t pulse_delay_us);
-bool dm542MoveMm(uint8_t ch, float mm, uint32_t pulse_delay_us);
-```
-
-## step 이동 원리
-
-DM542는 `PUL` 펄스 1개를 받을 때마다 모터를 1 step 이동시킵니다.
-
-```c
-dm542MoveStep(0, 1000, 10);
-```
-
-위 코드는 0번 DM542 채널을 정방향으로 1000 step 이동시킵니다. 각 step마다 PWM pulse를 10us 동안 출력합니다.
-
-`step` 값의 부호는 방향을 의미합니다.
-
-| step 값 | 동작 |
-| --- | --- |
-| 양수 | 정방향 |
-| 음수 | 역방향 |
-| 0 | 이동 없음 |
-
-## mm 이동 원리
-
-`dm542MoveMm()`는 mm 단위를 step 수로 변환한 뒤 `dm542MoveStep()`을 호출하는 래퍼 함수입니다.
-
-```c
-step = mm * DM542_STEP_PER_MM;
-dm542MoveStep(ch, step, pulse_delay_us);
-```
-
-현재 기본값:
-
-```c
-#define DM542_STEP_PER_MM  1.0f
-```
-
-실제 장비에서는 모터 step angle, DM542 마이크로스텝 설정, 볼스크류 리드 또는 벨트/풀리 조건에 맞춰 `DM542_STEP_PER_MM` 값을 정해야 합니다.
-
-예시:
+기본 흐름은 다음과 같습니다.
 
 ```text
-1.8도 모터       = 200 step/rev
-DM542 16분주     = 200 * 16 = 3200 step/rev
-리드스크류 5mm   = 3200 / 5 = 640 step/mm
+BOOT
+  -> RESET/Calibration
+  -> IDLE_HOME
+  -> START
+  -> START_ACTION
+  -> MOVING_TO_END
+  -> END_ACTION
+  -> READY_SEQUENCE
+  -> FOOT 입력 시 RUNNING_SEQUENCE
 ```
 
-이 경우:
+## 시퀀스 동작
+
+### RESET
+
+RESET은 장비 위치 기준을 다시 잡는 복구 동작입니다.
+
+```text
+1. 상태를 HOMING으로 변경
+2. 모든 구동부 안전 상태로 정리
+3. DM542 Calibration 실행
+   - End 방향으로 이동해 SN04_2 검출
+   - Home 방향으로 이동해 SN04_1 검출
+   - Home 위치를 0 step 기준으로 설정
+4. 성공 시 IDLE_HOME
+5. 실패 시 ERROR
+```
+
+### START
+
+START는 `IDLE_HOME` 상태에서만 실행됩니다.
+
+```text
+1. Pump ON
+2. Valve 1 OPEN
+3. Valve 2 OPEN
+4. Servo 20도
+5. Servo 180도
+6. DM542 MoveToFull 실행
+   - End 방향으로 고정 pulse 이동
+7. Servo 60도
+8. 300ms 대기
+9. Servo 170도
+10. READY_SEQUENCE 진입
+```
+
+### STOP
+
+STOP은 START 이후 동작 상태에서만 실행됩니다.
+
+```text
+1. Valve 1 CLOSE
+2. Valve 2 CLOSE
+3. Pump OFF
+4. Servo 180도
+5. DM542 MoveToZero 실행
+   - Home/Start 방향으로 고정 pulse 이동
+6. 성공 시 IDLE_HOME
+7. 실패 시 ERROR
+```
+
+### FOOT SWITCH
+
+FOOT SWITCH는 START 완료 후 `READY_SEQUENCE` 상태에서만 동작합니다.
+
+```text
+1. RUNNING_SEQUENCE 진입
+2. STOP 시퀀스 실행
+3. START 시퀀스 실행
+4. 성공 시 READY_SEQUENCE 복귀
+```
+
+## DM542 스텝모터 제어
+
+StepMotor task는 명령 큐와 ACK 큐를 사용합니다.
+
+### 명령
 
 ```c
-#define DM542_STEP_PER_MM  640.0f
+RTOS_STEP_MOTOR_NONE
+RTOS_STEP_MOTOR_MOVE_TO_ZERO
+RTOS_STEP_MOTOR_MOVE_TO_FULL
+RTOS_STEP_MOTOR_MOVE_TO_HOME
+RTOS_STEP_MOTOR_MOVE_TO_END
+RTOS_STEP_MOTOR_CALIBRATION
+RTOS_STEP_MOTOR_STOP
 ```
 
-## 사용 예시
+### ACK
 
 ```c
-dm542Init();
-dm542Open(0);
-
-dm542SetFreq(0, 1000);
-dm542Enable(0);
-
-dm542MoveStep(0, 1000, 10);
-dm542MoveStep(0, -1000, 10);
+RTOS_STEP_MOTOR_ACK_DONE
+RTOS_STEP_MOTOR_ACK_STOPPED
+RTOS_STEP_MOTOR_ACK_ERROR
 ```
 
-`dm542SetFreq()`는 PWM 기준 주파수 설정용이고, `dm542MoveStep()`의 `pulse_delay_us`는 한 step pulse를 켜두는 시간입니다.
+`threadStepMotor()`는 한 번에 긴 이동을 blocking으로 처리하지 않습니다. 남은 step을 작은 chunk로 나누고, 각 chunk를 `dm542MoveStepAsync()`로 실행합니다.
 
-## 현재 주의점
+```text
+새 명령 확인
+  -> 기존 명령이 있으면 정지 후 ACK_STOPPED
+  -> 새 명령 상태 초기화
+  -> 명령별 이동 조건 설정
 
-- CLI는 DM542 쪽에 추가하지 않았습니다.
-- `ENA` 핀 제어는 코드에서 하지 않습니다.
-- `dm542Enable()`은 실제 핀 출력이 아니라 내부 허용 상태 플래그입니다.
-- `DM542_STEP_PER_MM` 기본값은 임시값입니다. 실제 기구 조건에 맞게 설정해야 합니다.
-- `DIR` 출력은 `gpioPinWrite(DM542_DIR, dir)`로 처리합니다.
+센서 확인
+  -> 목표 센서 감지 시 DONE
+  -> 목표가 아닌 센서 감지 시 ERROR
+  -> limit 방향으로 이미 눌린 센서가 있으면 ERROR
 
+이동 처리
+  -> async chunk 실행 중이면 완료 event 대기
+  -> 완료되면 remain step 갱신
+  -> 다음 chunk 계산 후 async 실행
+```
+
+## 스텝모터 속도/Chunk 기준
+
+현재 유지하는 주파수와 chunk 값은 다음과 같습니다.
+
+| 구분 | 값 |
+| --- | --- |
+| Fast frequency | 25600 Hz |
+| Mid frequency | 16000 Hz |
+| Slow frequency | 6400 Hz |
+| Calibration frequency | 12800 Hz |
+| Fast chunk | 50 step |
+| Slow/Mid chunk | 10 step |
+| Calibration chunk | 1 step |
+
+가속/감속은 연속 ramp가 아니라 단계식 profile입니다.
+
+```text
+시작부: Slow -> Mid
+중간부: Fast
+도착부: Mid -> Slow
+```
+
+Calibration은 센서를 정확히 잡기 위해 profile을 쓰지 않고 12800Hz, 1 step chunk로 이동합니다.
+
+## SN04 센서 정책
+
+센서 매핑은 다음과 같습니다.
+
+| 센서 | 위치 | Event | 이동 제한 |
+| --- | --- | --- | --- |
+| SN04_1 | Home/Start | `APP_EVT_SN04_1_DETECTED` | Home 방향 추가 이동 차단 |
+| SN04_2 | End | `APP_EVT_SN04_2_DETECTED` | End 방향 추가 이동 차단 |
+
+방향 기준은 다음과 같습니다.
+
+```text
+step > 0 : End 방향
+step < 0 : Home/Start 방향
+```
+
+센서 위에서 반대 방향으로 빠져나가는 동작은 허용합니다.
+
+```text
+SN04_1 감지 중
+  -> Home 방향 이동 차단
+  -> End 방향 이동 허용
+
+SN04_2 감지 중
+  -> End 방향 이동 차단
+  -> Home 방향 이동 허용
+```
+
+이를 위해 `taskStepMotorPrepareLimitMove()`가 이동 시작 전에 현재 센서 상태를 확인합니다. 이동 방향 쪽 limit 센서가 이미 눌려 있으면 `ACK_ERROR`를 반환하고, 반대편 센서에서 빠져나가는 경우에는 해당 센서를 release될 때까지 DM542 sensor stop 조건에서 제외합니다.
+
+## 에러 처리
+
+StepMotor task에서 `RTOS_STEP_MOTOR_ACK_ERROR`가 발생하면 상위 시퀀스는 `enterErrorState()`로 진입합니다.
+
+```text
+1. DM542 STOP
+2. Pump OFF
+3. DC Motor STOP
+4. Servo HOME(180도)
+5. Valve OFF
+6. Control event clear
+7. APP_SEQUENCE_STATE_ERROR 고정
+```
+
+`ERROR` 상태에서는 START, STOP, FOOT 동작이 실행되지 않습니다. RESET을 눌러 Calibration을 다시 수행해야 복구됩니다.
+
+## 설계상 특징
+
+- 긴 이동을 blocking하지 않고 async chunk로 나눠 RTOS 반응성을 확보했습니다.
+- 센서 감지는 task polling과 EXTI callback을 함께 사용합니다.
+- SN04 감지 시 DM542는 ISR 경로에서 먼저 정지하고, StepMotor task는 ACK와 상태를 정리합니다.
+- limit 센서 위에서 빠져나가는 방향은 허용하고, limit 쪽으로 더 들어가는 방향은 차단합니다.
+- Zero/Full 이동은 좌표 보정이나 백래시 보정 없이 정해진 pulse만 출력합니다.
+- 에러 시 모든 구동부를 안전 상태로 정리합니다.
+
+## 빌드 참고
+
+프로젝트는 STM32CubeIDE 생성 구조를 따릅니다.
+
+```text
+stm32g474/
+  Debug/
+  src/
+```
+
+현재 작업 환경에서는 `arm-none-eabi-gcc`가 PATH에 없을 수 있습니다. 이 경우 전체 펌웨어 빌드는 STM32CubeIDE에서 수행하고, 로컬에서는 필요한 C 파일에 대해 `gcc -fsyntax-only` 수준의 문법 확인만 가능합니다.
+
+## 주의 사항
+
+- STOP은 비상정지 전용이라기보다 작업 중 Home 복귀 시퀀스에 가깝습니다.
+- RESET은 장비 기준 위치를 다시 잡는 복구 동작입니다.
+- SN04 센서 배선 또는 active level이 바뀌면 `sn04.c`와 sensor event 정책을 함께 확인해야 합니다.
+- 실제 기구 조건에 따라 `STEP_MOTOR_FULL_MOVE_STEPS`, `STEP_MOTOR_MOVE_MAX_STEPS`, 서보 각도, delay 값은 조정이 필요합니다.
