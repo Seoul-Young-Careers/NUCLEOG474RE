@@ -190,7 +190,7 @@ static bool runStopSequence(void)
     return false;
   }
 
-  if(taskStepMotorMoveToHome(&cmd_id) != true)
+  if(taskStepMotorMoveToZero(&cmd_id) != true)
   {
     enterErrorState();
     return false;
@@ -261,7 +261,7 @@ static bool runStartSequence(void)
 
   setState(APP_SEQUENCE_STATE_MOVING_TO_END);
 
-  if(taskStepMotorMoveToEnd(&cmd_id) != true)
+  if(taskStepMotorMoveToFull(&cmd_id) != true)
   {
     enterErrorState();
     return false;
