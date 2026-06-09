@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">FreeRTOS 관리 구조 다이어그램</title>
+  <desc id="desc">FreeRTOS가 태스크, 이벤트, 메시지 큐, 시간 기준을 관리하며 장치 동작을 정리하는 구조</desc>
+
+  <defs>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#34404a"/>
+    </marker>
+    <marker id="softArrow" markerWidth="13" markerHeight="13" refX="10" refY="6.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L11,6.5 L2,11 Z" fill="#60717f"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f5ef; }
+      .title { font: 800 34px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #1c252d; }
+      .subtitle { font: 400 18px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #5a6772; }
+      .centerTitle { font: 800 32px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #ffffff; }
+      .centerText { font: 500 17px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #ecf6ff; }
+      .boxTitle { font: 800 22px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #1c252d; }
+      .boxText { font: 500 16px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #48545e; }
+      .smallTitle { font: 800 18px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #1c252d; }
+      .smallText { font: 500 14px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #4b5660; }
+      .chipText { font: 700 14px 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif; fill: #ffffff; }
+      .card { stroke: #d4cec1; stroke-width: 2; rx: 18; ry: 18; }
+      .task { stroke: #c7d4df; stroke-width: 2; rx: 16; ry: 16; }
+      .line { fill: none; stroke: #34404a; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .softLine { fill: none; stroke: #60717f; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#softArrow); }
+      .dashLine { fill: none; stroke: #1f8a70; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 9 9; marker-end: url(#softArrow); }
+      .iconLine { fill: none; stroke: #1c252d; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="720"/>
+
+  <text class="title" x="640" y="58" text-anchor="middle">FreeRTOS가 관리하는 것들</text>
+  <text class="subtitle" x="640" y="91" text-anchor="middle">여러 일을 동시에 하는 것처럼 보이게 순서, 신호, 명령, 시간을 정리합니다.</text>
+
+  <!-- Center: FreeRTOS -->
+  <circle cx="640" cy="352" r="142" fill="#2f6f9f"/>
+  <circle cx="640" cy="352" r="116" fill="#3f83b8" opacity="0.86"/>
+  <text class="centerTitle" x="640" y="313" text-anchor="middle">FreeRTOS</text>
+  <text class="centerText" x="640" y="351" text-anchor="middle">작업 관리자</text>
+  <text class="centerText" x="640" y="381" text-anchor="middle">필요한 일을 깨우고</text>
+  <text class="centerText" x="640" y="408" text-anchor="middle">끝난 일은 다시 재웁니다.</text>
+
+  <!-- Management cards -->
+  <rect class="card" x="70" y="126" width="300" height="154" fill="#ffffff"/>
+  <rect class="card" x="910" y="126" width="300" height="154" fill="#ffffff"/>
+  <rect class="card" x="70" y="464" width="300" height="154" fill="#ffffff"/>
+  <rect class="card" x="910" y="464" width="300" height="154" fill="#ffffff"/>
+
+  <!-- Card 1: Tasks -->
+  <circle cx="105" cy="162" r="18" fill="#2f6f9f"/>
+  <text class="chipText" x="105" y="168" text-anchor="middle">1</text>
+  <text class="boxTitle" x="134" y="169">태스크 관리</text>
+  <text class="boxText" x="105" y="208">각 일을 작은 담당자로 나눕니다.</text>
+  <text class="boxText" x="105" y="237">버튼, 센서, 동작 순서, 모터, LED가</text>
+  <text class="boxText" x="105" y="263">서로 방해하지 않게 번갈아 실행됩니다.</text>
+
+  <!-- Card 2: Events -->
+  <circle cx="945" cy="162" r="18" fill="#1f8a70"/>
+  <text class="chipText" x="945" y="168" text-anchor="middle">2</text>
+  <text class="boxTitle" x="974" y="169">이벤트 관리</text>
+  <text class="boxText" x="945" y="208">버튼이나 센서가 신호를 보내면</text>
+  <text class="boxText" x="945" y="237">기다리던 태스크가 즉시 알아차립니다.</text>
+  <text class="boxText" x="945" y="263">START, STOP, RESET 같은 신호입니다.</text>
+
+  <!-- Card 3: Queues -->
+  <circle cx="105" cy="500" r="18" fill="#d66b4d"/>
+  <text class="chipText" x="105" y="506" text-anchor="middle">3</text>
+  <text class="boxTitle" x="134" y="507">메시지 큐 관리</text>
+  <text class="boxText" x="105" y="546">명령을 줄 세워 안전하게 전달합니다.</text>
+  <text class="boxText" x="105" y="575">예: 스텝모터에게 이동 명령을 보내고</text>
+  <text class="boxText" x="105" y="601">완료, 정지, 오류 응답을 돌려받습니다.</text>
+
+  <!-- Card 4: Time -->
+  <circle cx="945" cy="500" r="18" fill="#8b6fcb"/>
+  <text class="chipText" x="945" y="506" text-anchor="middle">4</text>
+  <text class="boxTitle" x="974" y="507">시간 관리</text>
+  <text class="boxText" x="945" y="546">10ms마다 버튼과 센서를 확인하고</text>
+  <text class="boxText" x="945" y="575">필요한 만큼 기다렸다가 다음 일을 합니다.</text>
+  <text class="boxText" x="945" y="601">짧은 대기 시간도 FreeRTOS가 정리합니다.</text>
+
+  <!-- Connections between center and management cards -->
+  <path class="line" d="M370 230 C444 240 488 275 525 311"/>
+  <path class="line" d="M910 230 C836 240 792 275 755 311"/>
+  <path class="line" d="M370 540 C444 524 493 480 532 424"/>
+  <path class="line" d="M910 540 C836 524 787 480 748 424"/>
+
+  <!-- Tasks row -->
+  <text class="smallTitle" x="640" y="129" text-anchor="middle">실제로 나뉘어 돌아가는 담당자들</text>
+  <g transform="translate(408 146)">
+    <rect class="task" x="0" y="0" width="130" height="58" fill="#eaf3fb"/>
+    <text class="smallTitle" x="65" y="24" text-anchor="middle">버튼</text>
+    <text class="smallText" x="65" y="45" text-anchor="middle">입력 감시</text>
+
+    <rect class="task" x="146" y="0" width="130" height="58" fill="#edf7ee"/>
+    <text class="smallTitle" x="211" y="24" text-anchor="middle">센서</text>
+    <text class="smallText" x="211" y="45" text-anchor="middle">위치 확인</text>
+
+    <rect class="task" x="292" y="0" width="130" height="58" fill="#fff1e8"/>
+    <text class="smallTitle" x="357" y="24" text-anchor="middle">순서 제어</text>
+    <text class="smallText" x="357" y="45" text-anchor="middle">동작 판단</text>
+  </g>
+
+  <g transform="translate(408 574)">
+    <rect class="task" x="0" y="0" width="130" height="58" fill="#fff8dc"/>
+    <text class="smallTitle" x="65" y="24" text-anchor="middle">스텝모터</text>
+    <text class="smallText" x="65" y="45" text-anchor="middle">이동 실행</text>
+
+    <rect class="task" x="146" y="0" width="130" height="58" fill="#f1edf9"/>
+    <text class="smallTitle" x="211" y="24" text-anchor="middle">LED</text>
+    <text class="smallText" x="211" y="45" text-anchor="middle">상태 표시</text>
+
+    <rect class="task" x="292" y="0" width="130" height="58" fill="#eaf3fb"/>
+    <text class="smallTitle" x="357" y="24" text-anchor="middle">메인</text>
+    <text class="smallText" x="357" y="45" text-anchor="middle">초기화</text>
+  </g>
+
+  <!-- Task connections -->
+  <path class="softLine" d="M473 204 C493 240 525 263 559 285"/>
+  <path class="softLine" d="M619 204 C624 240 628 263 632 285"/>
+  <path class="softLine" d="M765 204 C748 240 726 263 701 285"/>
+  <path class="softLine" d="M473 574 C500 528 529 487 563 430"/>
+  <path class="softLine" d="M619 574 C623 532 627 494 633 493"/>
+  <path class="softLine" d="M765 574 C742 528 719 487 696 430"/>
+
+  <!-- Communication strip -->
+  <rect x="430" y="258" width="420" height="188" rx="20" fill="#ffffff" stroke="#cfd8df" stroke-width="2"/>
+  <text class="smallTitle" x="640" y="288" text-anchor="middle">태스크끼리 주고받는 약속</text>
+
+  <rect x="462" y="313" width="156" height="82" rx="15" fill="#edf7ee" stroke="#b8d8c4" stroke-width="2"/>
+  <text class="smallTitle" x="540" y="342" text-anchor="middle">이벤트 플래그</text>
+  <text class="smallText" x="540" y="366" text-anchor="middle">눌림, 감지, 완료</text>
+
+  <rect x="662" y="313" width="156" height="82" rx="15" fill="#fff1e8" stroke="#e3c1ae" stroke-width="2"/>
+  <text class="smallTitle" x="740" y="342" text-anchor="middle">메시지 큐</text>
+  <text class="smallText" x="740" y="366" text-anchor="middle">명령과 응답</text>
+
+  <path class="dashLine" d="M540 395 C555 430 594 455 640 455 C686 455 725 430 740 395"/>
+  <text class="smallText" x="640" y="423" text-anchor="middle">FreeRTOS가 신호와 줄을 보관합니다.</text>
+
+  <!-- Bottom summary -->
+  <rect x="210" y="656" width="860" height="38" rx="19" fill="#1c252d"/>
+  <text class="chipText" x="640" y="681" text-anchor="middle">한 줄 요약: FreeRTOS는 여러 담당자가 언제 일하고, 어떤 신호를 받고, 어떤 명령을 처리할지 정리하는 운영 관리자입니다.</text>
+</svg>
