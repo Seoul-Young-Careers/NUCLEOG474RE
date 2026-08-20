@@ -49,18 +49,18 @@ static bool runStopSequence(void); 															// STOP 버튼을 눌렀을 �
 
 static bool runStartSequence(void);															// START 버튼을 눌렀을 때 필요한 전체 시작 시퀀스를 실행한다.
 
-static bool runFootSwitchSequence(void);												// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
+static bool runFootSwitchSequence(void);													// FOOT 스위치를 눌렀을 때 반복 장비 시퀀스를 처리한다.
 
-static bool isStopSequenceAllowed(void);												// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
-static void enterErrorState(void);														// 에러 발생 시 모든 구동부를 안전 상태로 내리고 ERROR 상태로 고정한다.
+static bool isStopSequenceAllowed(void);													// START 이후 상태에서만 STOP 시퀀스를 실행할 수 있는지 확인한다.
+static void enterErrorState(void);															// 에러 발생 시 모든 구동부를 안전 상태로 내리고 ERROR 상태로 고정한다.
 static void stopAllActuators(void);															// reset/error 시 모든 구동부를 안전한 기본 상태로 되돌린다.
-static bool handleResetStopRequest(void);												// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
-static bool servoMoveAndWait(float angle_deg);									// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
+static bool handleResetStopRequest(void);													// 긴 동작 중 RESET 또는 STOP 요청이 들어왔는지 확인하고 우선 처리한다.
+static bool servoMoveAndWait(float angle_deg);												// 서보를 지정 각도로 이동시키고, 이동 시간 동안 reset/stop을 감시한다.
 
-static bool delayInterruptible(uint32_t delay_ms);							// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
+static bool delayInterruptible(uint32_t delay_ms);											// 긴 대기 시간을 짧게 쪼개 reset/stop 요청에 반응할 수 있게 한다.
 
-static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);			// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
-static void setState(app_sequence_state_t state);								// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
+static app_sequence_wait_t waitStepMotor(uint32_t cmd_id);									// 스텝모터 명령 ACK를 기다리면서 reset/stop 요청을 함께 감시한다.
+static void setState(app_sequence_state_t state);											// 현재 시퀀스 상태를 갱신하고 로그로 남긴다.
 
 // 부팅 시 장비 위치를 보정한 뒤 서보를 부팅 전용 초기 각도로 보낸다.
 bool sequenceInit(void)

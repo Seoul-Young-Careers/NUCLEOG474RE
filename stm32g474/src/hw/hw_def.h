@@ -35,8 +35,8 @@
 
 //#define _USE_HW_LCD
 //#define _USE_HW_ST7735
-//#define		HW_LCD_WIDTH							160
-//#define 	HW_LCD_HEIGHT     				160
+//#define		HW_LCD_WIDTH					160
+//#define 	HW_LCD_HEIGHT     					160
 
 
 //#define _USE_HX711
